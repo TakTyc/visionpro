@@ -1,0 +1,360 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Vision Pro AR Fixed</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;
+  font-family:-apple-system,"SF Pro Display","Helvetica Neue",sans-serif;
+  -webkit-font-smoothing:antialiased}
+
+#video-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+}
+
+canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    background: transparent;
+}
+
+/* HUD */
+#hud{position:fixed;bottom:0;left:0;right:0;z-index:60;
+  padding:12px 20px 18px;
+  background:linear-gradient(to top,rgba(0,0,0,0.7),transparent);
+  display:flex;flex-direction:column;align-items:center;gap:10px}
+#hud.vis{display:flex}
+.hud-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);
+  border-radius:22px;padding:8px 16px;
+  color:#fff;font-size:13px;font-weight:500;cursor:pointer;
+  white-space:nowrap;transition:all .2s}
+.hud-btn:active{background:rgba(255,255,255,0.2)}
+.hud-btn.active{background:rgba(59,158,255,0.3);border-color:rgba(59,158,255,0.6)}
+.toggle-sw{width:40px;height:24px;background:rgba(255,255,255,0.15);
+  border-radius:12px;position:relative;cursor:pointer;
+  border:1px solid rgba(255,255,255,0.2);transition:background .3s}
+.toggle-sw.on{background:rgba(59,158,255,0.8)}
+.toggle-sw::after{content:"";position:absolute;left:3px;top:3px;
+  width:16px;height:16px;background:#fff;border-radius:50%;
+  transition:transform .3s;box-shadow:0 2px 4px rgba(0,0,0,0.3)}
+.toggle-sw.on::after{transform:translateX(16px)}
+.sep-label{font-size:11px;color:rgba(255,255,255,0.5)}
+#sep-slider{-webkit-appearance:none;width:70px;height:3px;
+  border-radius:2px;background:rgba(255,255,255,0.2);outline:none}
+#sep-slider::-webkit-slider-thumb{-webkit-appearance:none;
+  width:16px;height:16px;border-radius:50%;
+  background:rgba(255,255,255,0.9);box-shadow:0 2px 6px rgba(0,0,0,0.4)}
+
+/* Toast */
+#toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);
+  z-index:700;background:rgba(0,0,0,0.7);backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,0.15);border-radius:30px;
+  padding:10px 22px;font-size:13px;color:rgba(255,255,255,0.85);
+  white-space:nowrap;opacity:0;transition:opacity .3s;pointer-events:none}
+#toast.show{opacity:1}
+
+/* Perm screen */
+#perm{position:fixed;inset:0;z-index:900;
+  background:radial-gradient(ellipse at 25% 35%,#0d1b3e 0%,#000 65%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:22px;padding:40px}
+#perm.off{display:none}
+.p-logo{width:96px;height:96px;border-radius:30px;
+  background:linear-gradient(135deg,rgba(59,158,255,0.3),rgba(167,139,250,0.15));
+  border:1px solid rgba(255,255,255,0.25);
+  display:flex;align-items:center;justify-content:center;font-size:50px;
+  box-shadow:0 0 60px rgba(59,158,255,0.2),inset 0 1px 0 rgba(255,255,255,0.15)}
+.p-title{font-size:30px;font-weight:700;color:#fff;letter-spacing:-0.5px}
+.p-sub{font-size:14px;color:rgba(255,255,255,0.5);text-align:center;
+  line-height:1.7;max-width:290px}
+.p-btn{padding:15px 40px;
+  background:linear-gradient(135deg,rgba(59,158,255,0.4),rgba(167,139,250,0.25));
+  border:1px solid rgba(255,255,255,0.35);border-radius:50px;
+  color:#fff;font-size:17px;font-weight:600;cursor:pointer;
+  backdrop-filter:blur(10px);transition:all .2s}
+.p-btn:active{transform:scale(.95)}
+.p-err{font-size:13px;color:#ff6b6b;text-align:center;max-width:280px;display:none}
+</style>
+</head>
+<body>
+
+<!-- Permission screen -->
+<div id="perm">
+  <div class="p-logo">👁</div>
+  <div class="p-title">Vision Pro AR</div>
+  <div class="p-sub">Пространственный интерфейс будущего.<br>Требуется доступ к камере телефона.</div>
+  <button class="p-btn" id="cam-btn">Разрешить камеру</button>
+  <div class="p-err" id="p-err"></div>
+</div>
+
+<!-- Video background -->
+<video id="video-bg" autoplay muted playsinline></video>
+
+<!-- Canvas -->
+<canvas id="c"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div style="display:flex;gap:10px">
+    <button class="hud-btn" id="cam-flip-btn">🔄 Камера</button>
+    <button class="hud-btn" id="reset-btn">⊕ Сброс</button>
+  </div>
+  <div style="display:flex;gap:10px">
+    <span style="font-size:12px;color:rgba(255,255,255,.6)">VR</span>
+    <div class="toggle-sw" id="vr-tog" onclick="toggleVR()"></div>
+  </div>
+  <div id="sep-wrap" style="display:none">
+    <span class="sep-label">Separation</span>
+    <input type="range" id="sep-slider" min="0" max="100" value="32">
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script type="module">
+import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js";
+import { StereoEffect } from "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/effects/StereoEffect.js";
+
+/* ─── State ─── */
+const S = {
+  vrMode: false,
+  separation: 0.064,
+  camFacing: "environment",
+  stream: null,
+  gyroEnabled: false,
+  smoothAlpha: 0, smoothBeta: 0,
+  targetAlpha: 0, targetBeta: 0,
+  gamma: 0,
+  touches: [],
+  fingerSpheres: []
+};
+
+/* ─── Toast ─── */
+function toast(msg, dur=2500) {
+  const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), dur);
+}
+
+/* ─── Three.js core ─── */
+let scene, camera, renderer, effect;
+let clock = new THREE.Clock();
+let raycaster = new THREE.Raycaster();
+let euler = new THREE.Euler(0,0,0,"YXZ");
+const panels = [];
+
+function initThree() {
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 1.6, 0);
+  camera.lookAt(0, 1.6, -1);
+
+  renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("c"), antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  effect = new StereoEffect(renderer);
+  effect.eyeSeparation = S.separation;
+  effect.setSize(window.innerWidth, window.innerHeight);
+
+  /* Ambient light */
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const dLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dLight.position.set(5, 10, 5);
+  scene.add(dLight);
+
+  /* Virtual floor */
+  const floorGeo = new THREE.PlaneGeometry(20, 20, 20, 20);
+  const floorMat = new THREE.MeshBasicMaterial({
+    color: 0x1a2a4a, transparent: true, opacity: 0.15,
+    wireframe: true
+  });
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = 0;
+  scene.add(floor);
+
+  createPanels();
+  createHands();
+  animate();
+}
+
+function createPanels() {
+  const panelData = [
+    { x: -1, y: 1, z: -3, color: 0xff0000, title: "App 1" },
+    { x: 0, y: 1, z: -3.5, color: 0x00ff00, title: "App 2" },
+    { x: 1, y: 1, z: -3, color: 0x0000ff, title: "App 3" }
+  ];
+
+  panelData.forEach(data => {
+    const geo = new THREE.PlaneGeometry(1.4, 0.9);
+    const mat = new THREE.MeshBasicMaterial({ color: data.color, transparent: true, opacity: 0.8 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(data.x, data.y, data.z);
+    scene.add(mesh);
+    panels.push(mesh);
+  });
+}
+
+function createHands() {
+  for (let i = 0; i < 5; i++) {
+    const geo = new THREE.SphereGeometry(0.02, 8, 8);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x80c0ff, transparent: true, opacity: 0.8 });
+    const sphere = new THREE.Mesh(geo, mat);
+    sphere.position.set(0, 0, -1);
+    scene.add(sphere);
+    S.fingerSpheres.push(sphere);
+  }
+}
+
+function updateHands() {
+  if (S.touches.length === 0) return;
+  const touch = S.touches[0];
+  const mouse = new THREE.Vector2(
+    (touch.clientX / window.innerWidth) * 2 - 1,
+    -(touch.clientY / window.innerHeight) * 2 + 1
+  );
+  raycaster.setFromCamera(mouse, camera);
+  const pos3D = raycaster.ray.direction.clone().multiplyScalar(0.5).add(camera.position);
+
+  S.fingerSpheres.forEach((sphere, i) => {
+    sphere.position.set(
+      pos3D.x + i * 0.05,
+      pos3D.y,
+      pos3D.z
+    );
+  });
+}
+
+/* ─── Gyro ─── */
+function initGyro() {
+  const req = DeviceOrientationEvent?.requestPermission;
+  if (typeof req === "function") {
+    req().then(r => { if (r === "granted") listenGyro(); else toast("Гироскоп недоступен"); })
+         .catch(() => listenGyro());
+  } else {
+    listenGyro();
+  }
+}
+function listenGyro() {
+  window.addEventListener("deviceorientation", e => {
+    if (e.alpha !== null) {
+      S.gyroEnabled = true;
+      S.targetAlpha = e.alpha || 0;
+      S.targetBeta = e.beta || 0;
+      S.gamma = e.gamma || 0;
+    }
+  }, true);
+}
+function updateCamera(dt) {
+  if (S.gyroEnabled) {
+    const da = ((S.targetAlpha - S.smoothAlpha + 540) % 360) - 180;
+    S.smoothAlpha += da * Math.min(1, dt * 8);
+    S.smoothBeta += (S.targetBeta - S.smoothBeta) * Math.min(1, dt * 8);
+  }
+  const isLand = window.innerWidth > window.innerHeight;
+  euler.set(
+    THREE.MathUtils.degToRad(isLand ? (-S.smoothBeta + 90) * 0.3 : (-S.gamma) * 0.3),
+    THREE.MathUtils.degToRad(isLand ? -S.smoothAlpha * 0.3 : -S.smoothAlpha * 0.3),
+    0
+  );
+  camera.quaternion.slerp(new THREE.Quaternion().setFromEuler(euler), dt * 5);
+}
+
+/* ─── Touch ─── */
+document.addEventListener("touchstart", e => {
+  S.touches = Array.from(e.touches);
+}, { passive: false });
+document.addEventListener("touchmove", e => {
+  S.touches = Array.from(e.touches);
+  updateHands();
+}, { passive: false });
+document.addEventListener("touchend", e => {
+  S.touches = Array.from(e.touches);
+});
+
+/* ─── VR ─── */
+function toggleVR() {
+  S.vrMode = !S.vrMode;
+  document.getElementById("vr-tog").classList.toggle("on", S.vrMode);
+  document.getElementById("sep-wrap").style.display = S.vrMode ? "flex" : "none";
+  toast(S.vrMode ? "🕶️ VR режим включён" : "📱 Обычный режим");
+}
+
+/* ─── Animate ─── */
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.1);
+
+  updateCamera(dt);
+  updateHands();
+
+  if (S.vrMode) {
+    effect.render(scene, camera);
+  } else {
+    renderer.render(scene, camera);
+  }
+}
+
+/* ─── Camera ─── */
+async function startCamera(facing) {
+  if (S.stream) { S.stream.getTracks().forEach(t => t.stop()); }
+  const constraints = { video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false };
+  try {
+    S.stream = await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (e) {
+    if (facing === "environment") {
+      toast("Задняя камера недоступна, переключаюсь на фронтальную");
+      S.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    } else throw e;
+  }
+  const video = document.getElementById("video-bg");
+  video.srcObject = S.stream;
+  await new Promise(r => video.onloadedmetadata = r);
+}
+
+document.getElementById("cam-flip-btn").addEventListener("click", async () => {
+  S.camFacing = S.camFacing === "environment" ? "user" : "environment";
+  await startCamera(S.camFacing);
+  toast(S.camFacing === "environment" ? "📷 Задняя камера" : "🤳 Фронтальная камера");
+});
+
+document.getElementById("reset-btn").addEventListener("click", () => {
+  S.smoothAlpha = 0; S.smoothBeta = 0; S.targetAlpha = 0; S.targetBeta = 0;
+  camera.quaternion.set(0, 0, 0, 1);
+  toast("⊕ Вид сброшен");
+});
+
+/* ─── Boot ─── */
+document.getElementById("cam-btn").addEventListener("click", async () => {
+  document.getElementById("perm").classList.add("off");
+  try {
+    await startCamera("environment");
+    initThree();
+    initGyro();
+    document.getElementById("hud").classList.add("vis");
+    toast("👁 Добро пожаловать в Vision Pro AR!", 3000);
+  } catch (err) {
+    const e = document.getElementById("p-err");
+    e.style.display = "block";
+    e.textContent = "⚠️ " + (err.name === "NotAllowedError"
+      ? "Доступ к камере отклонён. Разрешите в настройках."
+      : "Ошибка: " + err.message);
+  }
+});
+</script>
+</body>
+</html>
