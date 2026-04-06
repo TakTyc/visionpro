@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Vision Pro Cardboard VR</title>
+  <title>VisionOS Cardboard VR</title>
   <style>
     html, body {
       margin: 0;
@@ -63,6 +63,7 @@
       cursor: pointer;
       transition: background 0.2s;
       font-weight: 500;
+      backdrop-filter: blur(10px);
     }
 
     .btn:hover {
@@ -73,7 +74,7 @@
       display: none;
     }
 
-    #app-menu {
+    #appMenu {
       position: fixed;
       bottom: 100px;
       left: 0;
@@ -83,56 +84,33 @@
       justify-content: center;
       gap: 15px;
       padding: 10px;
+      flex-wrap: wrap;
     }
 
-    .app-icon {
-      width: 70px;
-      height: 70px;
+    .appIcon {
+      width: 80px;
+      height: 80px;
       background: rgba(255, 255, 255, 0.1);
       border-radius: 20px;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-size: 24px;
+      font-size: 12px;
       cursor: pointer;
       transition: background 0.2s;
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.1);
+      text-align: center;
     }
 
-    .app-icon:hover {
+    .appIcon:hover {
       background: rgba(255, 255, 255, 0.2);
     }
 
-    .window {
-      background: rgba(0, 0, 0, 0.8);
-      border-radius: 20px;
-      padding: 20px;
-      min-width: 300px;
-      min-height: 200px;
-      position: relative;
-      backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      font-size: 18px;
-      color: #fff;
-    }
-
-    .window .close-btn {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: rgba(255, 0, 0, 0.6);
-      border: none;
-      border-radius: 50%;
-      width: 30px;
-      height: 30px;
-      color: #fff;
-      font-size: 16px;
-      cursor: pointer;
-    }
-
-    .window.dragging {
-      opacity: 0.8;
+    .appIcon .emoji {
+      font-size: 24px;
+      margin-bottom: 4px;
     }
   </style>
   <script type="importmap">
@@ -158,13 +136,31 @@
     </label>
   </div>
 
-  <div id="app-menu">
-    <div class="app-icon" data-app="youtube">📺</div>
-    <div class="app-icon" data-app="drawing">🎨</div>
-    <div class="app-icon" data-app="earth">🌍</div>
-    <div class="app-icon" data-app="notes">📝</div>
-    <div class="app-icon" data-app="meditation">🧘</div>
-    <div class="app-icon" data-app="monitor">📊</div>
+  <div id="appMenu">
+    <div class="appIcon" data-app="youtube">
+      <div class="emoji">🎬</div>
+      YouTube
+    </div>
+    <div class="appIcon" data-app="draw">
+      <div class="emoji">✏️</div>
+      Рисование
+    </div>
+    <div class="appIcon" data-app="earth">
+      <div class="emoji">🌍</div>
+      Космос
+    </div>
+    <div class="appIcon" data-app="notes">
+      <div class="emoji">📝</div>
+      Заметки
+    </div>
+    <div class="appIcon" data-app="meditate">
+      <div class="emoji">🧘</div>
+      Медитация
+    </div>
+    <div class="appIcon" data-app="monitor">
+      <div class="emoji">📊</div>
+      Монитор
+    </div>
   </div>
 
   <script type="module">
@@ -172,40 +168,71 @@
     import { StereoEffect } from 'three/addons/effects/StereoEffect.js';
     import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
-    let videoStream = null;
-    let currentCamera = 'environment';
-    let renderer, scene, camera, effect, cssRenderer;
-    let vrActive = false;
-    let handGroup, handSpheres = [], handLines = [];
-    let windows = [];
-    let draggingWindow = null;
-    let dragOffset = new THREE.Vector3();
+    console.log('VisionOS Cardboard VR starting...');
 
-    async function initCamera(facingMode) {
-      if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
-      }
-      const constraints = {
-        video: { facingMode: { exact: facingMode } }
-      };
-      try {
-        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-        const videoEl = document.getElementById('bgVideo');
-        videoEl.srcObject = videoStream;
-        videoEl.play();
-        videoEl.style.display = 'block';
-        return true;
-      } catch (err) {
-        const fallback = { video: { facingMode: facingMode } };
-        videoStream = await navigator.mediaDevices.getUserMedia(fallback);
-        document.getElementById('bgVideo').srcObject = videoStream;
-        document.getElementById('bgVideo').play();
-        document.getElementById('bgVideo').style.display = 'block';
-        return true;
+    let currentStream = null;
+    let currentFacing = 'environment';
+    let renderer, scene, camera, effect, cssRenderer, raycaster, mouse;
+    let vrMode = false;
+    let handGroup, spheres = [];
+    let windows = [];
+    let activeTouches = new Map();
+
+    function stopStream() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
       }
     }
 
-    function initThree() {
+    function startCamera() {
+      stopStream();
+
+      const constraints = {
+        video: {
+          facingMode: { exact: currentFacing },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      };
+
+      navigator.mediaDevices.getUserMedia(constraints)
+        .then(stream => {
+          currentStream = stream;
+          const video = document.getElementById('bgVideo');
+          video.srcObject = stream;
+          video.play().catch(e => console.log('autoplay blocked', e));
+          video.style.display = 'block';
+
+          document.getElementById('cameraBtn').style.display = 'none';
+          document.getElementById('switchCamBtn').style.display = 'inline-block';
+          console.log('Camera started successfully');
+        })
+        .catch(err => {
+          console.error('Camera error:', err);
+          // Fallback без exact
+          navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacing } })
+            .then(stream => {
+              currentStream = stream;
+              document.getElementById('bgVideo').srcObject = stream;
+              document.getElementById('bgVideo').play();
+              document.getElementById('bgVideo').style.display = 'block';
+              document.getElementById('cameraBtn').style.display = 'none';
+              document.getElementById('switchCamBtn').style.display = 'inline-block';
+              console.log('Camera started with fallback');
+            })
+            .catch(err2 => {
+              alert('Ошибка камеры: ' + err2.message);
+            });
+        });
+    }
+
+    function switchCamera() {
+      currentFacing = currentFacing === 'environment' ? 'user' : 'environment';
+      startCamera();
+    }
+
+    function init3D() {
       renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('scene-canvas'), antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setSize(window.innerWidth, window.innerHeight);
@@ -223,6 +250,9 @@
       camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
       camera.position.set(0, 1.6, 0);
 
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2();
+
       const ambient = new THREE.AmbientLight(0xffffff, 0.7);
       scene.add(ambient);
 
@@ -238,105 +268,88 @@
 
     function createHandVisuals() {
       handGroup = new THREE.Group();
-      scene.add(handGroup);
+      scene.add(handGroup); // Добавляем после окон, чтобы быть поверх
 
-      const sphereMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, transparent: true, opacity: 0.8 });
-      for (let i = 0; i < 5; i++) {
-        const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 12), sphereMaterial);
+      const fingerPositions = [
+        [0, 0, 0],    // большой
+        [0.1, 0, 0],  // указательный
+        [0.2, 0, 0],  // средний
+        [0.3, 0, 0],  // безымянный
+        [0.4, 0, 0]   // мизинец
+      ];
+
+      fingerPositions.forEach(pos => {
+        const sphere = new THREE.Mesh(
+          new THREE.SphereGeometry(0.05),
+          new THREE.MeshStandardMaterial({ color: 0xffaa88, emissive: 0x442200 })
+        );
+        sphere.position.set(pos[0], pos[1], pos[2]);
         sphere.visible = false;
         handGroup.add(sphere);
-        handSpheres.push(sphere);
-      }
-
-      const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 2 });
-      for (let i = 0; i < 4; i++) {
-        const geometry = new THREE.BufferGeometry();
-        const positions = new Float32Array(6);
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const line = new THREE.Line(geometry, lineMaterial);
-        line.visible = false;
-        handGroup.add(line);
-        handLines.push(line);
-      }
+        spheres.push(sphere);
+      });
     }
 
-    function updateHands(touches) {
-      if (touches.length === 0) {
-        handSpheres.forEach(s => s.visible = false);
-        handLines.forEach(l => l.visible = false);
-        return;
-      }
-
-      touches.slice(0, 5).forEach((touch, i) => {
-        const x = (touch.clientX / window.innerWidth) * 2 - 1;
-        const y = -(touch.clientY / window.innerHeight) * 2 + 1;
-        const vector = new THREE.Vector3(x, y, 0.5);
-        vector.unproject(camera);
-        const dir = vector.sub(camera.position).normalize();
-        const distance = 0.5;
-        const pos = camera.position.clone().add(dir.multiplyScalar(distance));
-        handSpheres[i].position.copy(pos);
-        handSpheres[i].visible = true;
-      });
-
-      for (let i = 0; i < Math.min(touches.length - 1, 4); i++) {
-        const pos1 = handSpheres[i].position;
-        const pos2 = handSpheres[i + 1].position;
-        const positions = handLines[i].geometry.attributes.position.array;
-        positions[0] = pos1.x; positions[1] = pos1.y; positions[2] = pos1.z;
-        positions[3] = pos2.x; positions[4] = pos2.y; positions[5] = pos2.z;
-        handLines[i].geometry.attributes.position.needsUpdate = true;
-        handLines[i].visible = true;
-      }
+    function updateFingerPosition(index, x, y) {
+      const vector = new THREE.Vector2(
+        (x / window.innerWidth) * 2 - 1,
+        -(y / window.innerHeight) * 2 + 1
+      );
+      raycaster.setFromCamera(vector, camera);
+      const pos3D = raycaster.ray.direction.clone().multiplyScalar(0.6);
+      spheres[index].position.copy(camera.position.clone().add(pos3D));
+      spheres[index].visible = true;
     }
 
-    function createWindow(appType) {
-      const windowDiv = document.createElement('div');
-      windowDiv.className = 'window';
-      windowDiv.innerHTML = `<button class="close-btn">×</button><h2>${getAppTitle(appType)}</h2><p>${getAppContent(appType)}</p>`;
+    function createAppWindow(appName, x, y, z) {
+      const group = new THREE.Group();
 
-      const windowObject = new CSS2DObject(windowDiv);
-      windowObject.position.set(0, 1.5, -2.5);
-      scene.add(windowObject);
-      windows.push(windowObject);
-
-      windowDiv.querySelector('.close-btn').onclick = () => {
-        scene.remove(windowObject);
-        windows = windows.filter(w => w !== windowObject);
-      };
-
-      windowDiv.addEventListener('touchstart', (e) => {
-        draggingWindow = windowObject;
-        const rect = windowDiv.getBoundingClientRect();
-        dragOffset.set(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top, 0);
-        windowDiv.classList.add('dragging');
+      // Стеклянная панель
+      const geometry = new THREE.BoxGeometry(1.2, 0.8, 0.05);
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x88aaff,
+        transparent: true,
+        opacity: 0.85,
+        metalness: 0.7,
+        roughness: 0.2
       });
+      const panel = new THREE.Mesh(geometry, material);
+      group.add(panel);
 
-      windowDiv.addEventListener('touchmove', (e) => {
-        if (draggingWindow) {
-          const x = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
-          const y = -(e.touches[0].clientY / window.innerHeight) * 2 + 1;
-          const vector = new THREE.Vector3(x, y, 0.5);
-          vector.unproject(camera);
-          const dir = vector.sub(camera.position).normalize();
-          const pos = camera.position.clone().add(dir.multiplyScalar(2.5));
-          draggingWindow.position.copy(pos);
-        }
-      });
+      // Текст заголовка с помощью CSS2DObject
+      const textDiv = document.createElement('div');
+      textDiv.style.fontSize = '24px';
+      textDiv.style.fontWeight = 'bold';
+      textDiv.style.color = '#fff';
+      textDiv.style.textAlign = 'center';
+      textDiv.innerHTML = getAppTitle(appName) + '<br><small>' + getAppContent(appName) + '</small>';
+      const textObject = new CSS2DObject(textDiv);
+      textObject.position.set(0, 0.1, 0.03);
+      group.add(textObject);
 
-      windowDiv.addEventListener('touchend', () => {
-        draggingWindow = null;
-        windowDiv.classList.remove('dragging');
-      });
+      // Кнопка закрытия — красная сфера
+      const closeBtnGeometry = new THREE.SphereGeometry(0.08);
+      const closeMaterial = new THREE.MeshStandardMaterial({ color: 0xff3333 });
+      const closeButton = new THREE.Mesh(closeBtnGeometry, closeMaterial);
+      closeButton.position.set(0.55, 0.35, 0.04);
+      closeButton.userData = { isCloseButton: true, windowGroup: group };
+      group.add(closeButton);
+
+      group.position.set(x, y, z);
+      scene.add(group);
+
+      windows.push(group);
+      console.log('Window created:', appName);
+      return group;
     }
 
     function getAppTitle(app) {
       const titles = {
         youtube: 'YouTube',
-        drawing: 'Рисование',
-        earth: 'Земля',
+        draw: 'Рисование',
+        earth: 'Космос',
         notes: 'Заметки',
-        meditation: 'Медитация',
+        meditate: 'Медитация',
         monitor: 'Монитор'
       };
       return titles[app] || 'Приложение';
@@ -344,27 +357,64 @@
 
     function getAppContent(app) {
       const contents = {
-        youtube: 'Здесь будет плеер YouTube.',
-        drawing: 'Инструменты для рисования.',
-        earth: '3D модель Земли.',
-        notes: 'Ваши заметки.',
-        meditation: 'Релаксация и медитация.',
-        monitor: 'Системная информация.'
+        youtube: 'Видео и музыка',
+        draw: 'Творчество',
+        earth: 'Планета Земля',
+        notes: 'Ваши записи',
+        meditate: 'Релакс',
+        monitor: 'Статистика'
       };
-      return contents[app] || 'Содержимое приложения.';
+      return contents[app] || 'Содержимое';
+    }
+
+    function onClickWindow(event) {
+      mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
+      mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(scene.children, true);
+
+      for (let hit of intersects) {
+        if (hit.object.userData.isCloseButton) {
+          const windowGroup = hit.object.userData.windowGroup;
+          scene.remove(windowGroup);
+          windows = windows.filter(w => w !== windowGroup);
+          // Очищаем ресурсы
+          windowGroup.children.forEach(child => {
+            if (child.isMesh) {
+              child.geometry.dispose();
+              child.material.dispose();
+            }
+          });
+          console.log('Window closed');
+          return;
+        }
+      }
+    }
+
+    function toggleVR(enable) {
+      vrMode = enable;
+      if (vrMode) {
+        effect.setSize(window.innerWidth, window.innerHeight);
+      }
+      console.log('VR mode:', vrMode);
     }
 
     function onResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      renderer.setSize(width, height);
+      if (effect) effect.setSize(width, height);
+      if (cssRenderer) cssRenderer.setSize(width, height);
+      camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      cssRenderer.setSize(window.innerWidth, window.innerHeight);
-      if (effect) effect.setSize(window.innerWidth, window.innerHeight);
+      console.log('Resized to', width, height);
     }
 
     function animate() {
       requestAnimationFrame(animate);
-      if (vrActive && effect) {
+      if (vrMode) {
         effect.render(scene, camera);
       } else {
         renderer.render(scene, camera);
@@ -373,39 +423,60 @@
     }
 
     // Event listeners
-    document.getElementById('cameraBtn').onclick = async () => {
-      try {
-        await initCamera(currentCamera);
-        document.getElementById('cameraBtn').style.display = 'none';
-        document.getElementById('switchCamBtn').style.display = 'inline-block';
-        initThree();
-      } catch (e) {
-        alert('Ошибка: ' + e.message);
-      }
+    document.getElementById('cameraBtn').onclick = function() {
+      startCamera();
     };
 
-    document.getElementById('switchCamBtn').onclick = async () => {
-      currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
-      try {
-        await initCamera(currentCamera);
-      } catch (e) {
-        alert('Ошибка переключения: ' + e.message);
-      }
+    document.getElementById('switchCamBtn').onclick = function() {
+      switchCamera();
     };
 
-    document.getElementById('vrToggle').onchange = (e) => {
-      vrActive = e.target.checked;
+    document.getElementById('vrToggle').onchange = function(e) {
+      toggleVR(e.target.checked);
     };
 
-    document.querySelectorAll('.app-icon').forEach(icon => {
-      icon.onclick = () => {
-        createWindow(icon.dataset.app);
+    document.querySelectorAll('.appIcon').forEach(icon => {
+      icon.onclick = function() {
+        const appName = this.dataset.app;
+        const newWindow = createAppWindow(appName,
+          (Math.random() - 0.5) * 2,  // случайный X
+          1,                          // Y
+          -2.5                        // Z
+        );
       };
     });
 
-    document.addEventListener('touchstart', (e) => updateHands(e.touches));
-    document.addEventListener('touchmove', (e) => updateHands(e.touches));
-    document.addEventListener('touchend', (e) => updateHands(e.touches));
+    window.addEventListener('click', onClickWindow);
+
+    window.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      for (let i = 0; i < e.touches.length && i < 5; i++) {
+        const touch = e.touches[i];
+        activeTouches.set(touch.identifier, i);
+        updateFingerPosition(i, touch.clientX, touch.clientY);
+      }
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (let i = 0; i < e.touches.length && i < 5; i++) {
+        const touch = e.touches[i];
+        const fingerIndex = activeTouches.get(touch.identifier);
+        if (fingerIndex !== undefined) {
+          updateFingerPosition(fingerIndex, touch.clientX, touch.clientY);
+        }
+      }
+    });
+
+    window.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      spheres.forEach(sphere => sphere.visible = false);
+      activeTouches.clear();
+    });
+
+    // Инициализация
+    init3D();
+    console.log('VisionOS initialized');
   </script>
 </body>
 </html>
