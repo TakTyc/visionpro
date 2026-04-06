@@ -1,665 +1,411 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>Vision Pro Cardboard VR</title>
-<style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    position: fixed;
-    top: 0;
-    left: 0;
-    background: #000;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Vision Pro Cardboard VR</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background: #000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+    }
 
-  canvas {
-    display: block;
-    width: 100% !important;
-    height: 100% !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    z-index: 1;
-  }
+    #bgVideo {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+      display: none;
+    }
 
-  #video-bg {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    z-index: 0;
-  }
+    #scene-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
 
-  #controls {
-    position: fixed;
-    bottom: 20px;
-    left: 0;
-    right: 0;
-    z-index: 2;
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    padding: 10px;
-  }
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      z-index: 3;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      padding: 10px;
+    }
 
-  .btn {
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 20px;
-    color: #fff;
-    padding: 10px 20px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
+    .btn {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 40px;
+      color: #fff;
+      padding: 12px 24px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-weight: 500;
+    }
 
-  .btn:hover {
-    background: rgba(255,255,255,0.2);
-  }
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
 
-  .btn.hidden {
-    display: none;
-  }
+    .btn.hidden {
+      display: none;
+    }
 
-  #toast {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 3;
-    background: rgba(0,0,0,0.8);
-    color: #fff;
-    padding: 10px 20px;
-    border-radius: 20px;
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
+    #app-menu {
+      position: fixed;
+      bottom: 100px;
+      left: 0;
+      right: 0;
+      z-index: 3;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      padding: 10px;
+    }
 
-  #toast.show {
-    opacity: 1;
-  }
-</style>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
-    "three/examples/jsm/effects/StereoEffect.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/effects/StereoEffect.js"
-  }
-}
-</script>
+    .app-icon {
+      width: 70px;
+      height: 70px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      cursor: pointer;
+      transition: background 0.2s;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .app-icon:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .window {
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 20px;
+      padding: 20px;
+      min-width: 300px;
+      min-height: 200px;
+      position: relative;
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 18px;
+      color: #fff;
+    }
+
+    .window .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255, 0, 0, 0.6);
+      border: none;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .window.dragging {
+      opacity: 0.8;
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
+        "three/addons/effects/StereoEffect.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/effects/StereoEffect.js",
+        "three/addons/renderers/CSS2DRenderer.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/renderers/CSS2DRenderer.js"
+      }
+    }
+  </script>
 </head>
 <body>
-  <video id="video-bg"></video>
+  <video id="bgVideo"></video>
   <canvas id="scene-canvas"></canvas>
 
   <div id="controls">
-    <button id="enableCameraBtn" class="btn" onclick="startCameraWithPermission()">📷 Включить камеру</button>
-    <button id="switchCameraBtn" class="btn hidden">🔄 Переключить камеру</button>
-    <button id="vrToggleBtn" class="btn hidden">🕶️ VR On/Off</button>
-    <button id="resetBtn" class="btn hidden">⊕ Сброс</button>
+    <button id="cameraBtn" class="btn">📷 Включить камеру</button>
+    <button id="switchCamBtn" class="btn hidden">🔄 Переключить камеру</button>
+    <label class="btn">
+      <input type="checkbox" id="vrToggle" style="display: none;">
+      🕶️ VR Mode
+    </label>
   </div>
 
-  <div id="toast"></div>
+  <div id="app-menu">
+    <div class="app-icon" data-app="youtube">📺</div>
+    <div class="app-icon" data-app="drawing">🎨</div>
+    <div class="app-icon" data-app="earth">🌍</div>
+    <div class="app-icon" data-app="notes">📝</div>
+    <div class="app-icon" data-app="meditation">🧘</div>
+    <div class="app-icon" data-app="monitor">📊</div>
+  </div>
 
   <script type="module">
     import * as THREE from 'three';
-    import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js';
+    import { StereoEffect } from 'three/addons/effects/StereoEffect.js';
+    import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
-    console.log('Vision Pro Cardboard VR starting...');
+    let videoStream = null;
+    let currentCamera = 'environment';
+    let renderer, scene, camera, effect, cssRenderer;
+    let vrActive = false;
+    let handGroup, handSpheres = [], handLines = [];
+    let windows = [];
+    let draggingWindow = null;
+    let dragOffset = new THREE.Vector3();
 
-    const state = {
-      stream: null,
-      facingMode: 'environment',
-      stereoEnabled: true,
-      stereoSupported: true,
-      appSelected: null,
-      pinchActive: false,
-      pinchTriggered: false,
-      touches: [],
-      fps: 0,
-      battery: null,
-      sculptorPoints: []
-    };
-
-    const video = document.getElementById('video-bg');
-    const canvas = document.getElementById('scene-canvas');
-    const enableCameraBtn = document.getElementById('enableCameraBtn');
-    const switchCameraBtn = document.getElementById('switchCameraBtn');
-    const vrToggleBtn = document.getElementById('vrToggleBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const toastEl = document.getElementById('toast');
-
-    let renderer, scene, camera, effect, clock, raycaster, animationId;
-    const appPanels = [];
-    const handSpheres = [];
-    let handLine;
-    let selectedPanel = null;
-    let lastFrameTime = performance.now();
-    let fpsSmoothing = 0;
-
-    const appDefinitions = [
-      { id: 'cinema', title: 'Кинозал', subtitle: 'Откройте видео с YouTube', x: -2.2, z: -3.0 },
-      { id: 'sculptor', title: '3D-скульптор', subtitle: 'Рисуйте линии касанием', x: 0.0, z: -3.6 },
-      { id: 'space', title: 'Космос', subtitle: 'Вращающаяся Земля', x: 2.2, z: -4.0 },
-      { id: 'browser', title: 'Браузер окон', subtitle: 'Нотатки и быстрый доступ', x: -1.1, z: -4.5 },
-      { id: 'meditation', title: 'Медитация', subtitle: 'Частицы и спокойствие', x: 1.1, z: -5.0 },
-      { id: 'monitor', title: 'Монитор системы', subtitle: 'FPS и заряд батареи', x: 0.0, z: -4.8 }
-    ];
-
-    const panelSize = { width: 1.44, height: 0.84 };
-    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x7cc8ff, linewidth: 2, transparent: true, opacity: 0.85 });
-
-    function showToast(message, duration = 2400) {
-      toastEl.textContent = message;
-      toastEl.classList.add('show');
-      clearTimeout(state.toastTimeout);
-      state.toastTimeout = setTimeout(() => toastEl.classList.remove('show'), duration);
-    }
-
-    function createPanelTexture(app) {
-      const canvasTexture = document.createElement('canvas');
-      canvasTexture.width = 512;
-      canvasTexture.height = 320;
-      const ctx = canvasTexture.getContext('2d');
-      ctx.fillStyle = '#0f1a35';
-      ctx.fillRect(0, 0, canvasTexture.width, canvasTexture.height);
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.font = 'bold 42px sans-serif';
-      ctx.fillText(app.title, 24, 72);
-      ctx.font = '18px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.72)';
-      wrapText(ctx, app.subtitle, 24, 110, 460, 24);
-      ctx.fillStyle = 'rgba(255,255,255,0.18)';
-      ctx.fillRect(18, 132, 476, 154);
-      ctx.fillStyle = 'rgba(255,255,255,0.12)';
-      for (let i = 0; i < 4; i += 1) {
-        ctx.fillRect(30, 144 + i * 34, 420, 18);
+    async function initCamera(facingMode) {
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
       }
-      ctx.fillStyle = '#86b7ff';
-      ctx.beginPath();
-      ctx.arc(478, 52, 30, 0, Math.PI * 2);
-      ctx.fill();
-      return new THREE.CanvasTexture(canvasTexture);
-    }
-
-    function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-      const words = text.split(' ');
-      let line = '';
-      for (const word of words) {
-        const testLine = `${line}${word} `;
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth && line.length > 0) {
-          ctx.fillText(line, x, y);
-          line = `${word} `;
-          y += lineHeight;
-        } else {
-          line = testLine;
-        }
-      }
-      ctx.fillText(line.trim(), x, y);
-    }
-
-    async function startCamera(facingMode = 'environment') {
-      console.log('Starting camera...');
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera not supported');
-      }
-
-      if (state.stream) {
-        state.stream.getTracks().forEach(track => track.stop());
-        state.stream = null;
-      }
-
       const constraints = {
-        audio: false,
-        video: {
-          facingMode: { exact: facingMode },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
+        video: { facingMode: { exact: facingMode } }
       };
-
       try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        state.stream = stream;
-        video.srcObject = stream;
-        await video.play();
-        if (video.readyState < 2) {
-          await new Promise(resolve => { video.onloadedmetadata = resolve; });
-        }
-        state.facingMode = facingMode;
-        console.log('Camera started successfully');
-        showToast('Камера запущена');
-        enableCameraBtn.classList.add('hidden');
-        switchCameraBtn.classList.remove('hidden');
-        vrToggleBtn.classList.remove('hidden');
-        resetBtn.classList.remove('hidden');
-        return stream;
-      } catch (error) {
-        console.error('Camera error:', error);
-        // Fallback to basic constraints
-        const fallbackConstraints = {
-          audio: false,
-          video: {
-            facingMode: facingMode,
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          }
-        };
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
-          state.stream = stream;
-          video.srcObject = stream;
-          await video.play();
-          if (video.readyState < 2) {
-            await new Promise(resolve => { video.onloadedmetadata = resolve; });
-          }
-          state.facingMode = facingMode;
-          console.log('Camera started with fallback');
-          showToast('Камера запущена (fallback)');
-          enableCameraBtn.classList.add('hidden');
-          switchCameraBtn.classList.remove('hidden');
-          vrToggleBtn.classList.remove('hidden');
-          resetBtn.classList.remove('hidden');
-          return stream;
-        } catch (fallbackError) {
-          console.error('Fallback camera error:', fallbackError);
-          throw fallbackError;
-        }
+        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+        const videoEl = document.getElementById('bgVideo');
+        videoEl.srcObject = videoStream;
+        videoEl.play();
+        videoEl.style.display = 'block';
+        return true;
+      } catch (err) {
+        const fallback = { video: { facingMode: facingMode } };
+        videoStream = await navigator.mediaDevices.getUserMedia(fallback);
+        document.getElementById('bgVideo').srcObject = videoStream;
+        document.getElementById('bgVideo').play();
+        document.getElementById('bgVideo').style.display = 'block';
+        return true;
       }
     }
-
-
 
     function initThree() {
-      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('scene-canvas'), antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.setClearColor(0x000000, 0);
 
+      cssRenderer = new CSS2DRenderer();
+      cssRenderer.setSize(window.innerWidth, window.innerHeight);
+      cssRenderer.domElement.style.position = 'absolute';
+      cssRenderer.domElement.style.top = '0';
+      cssRenderer.domElement.style.pointerEvents = 'none';
+      document.body.appendChild(cssRenderer.domElement);
+
       scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x000000, 0.02);
 
       camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
       camera.position.set(0, 1.6, 0);
-      camera.lookAt(0, 1.5, -3);
-
-      clock = new THREE.Clock();
-      raycaster = new THREE.Raycaster();
 
       const ambient = new THREE.AmbientLight(0xffffff, 0.7);
       scene.add(ambient);
-      const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
-      dirLight.position.set(5, 10, 5);
-      scene.add(dirLight);
 
-      const floor = new THREE.Mesh(
-        new THREE.PlaneGeometry(24, 24),
-        new THREE.MeshStandardMaterial({ color: 0x0f1b35, roughness: 0.85, metalness: 0.1, transparent: true, opacity: 0.14 })
-      );
-      floor.rotation.x = -Math.PI / 2;
-      floor.position.y = -0.05;
-      scene.add(floor);
+      effect = new StereoEffect(renderer);
+      effect.eyeSeparation = 0.064;
+      effect.setSize(window.innerWidth, window.innerHeight);
 
-      createAppPanels();
       createHandVisuals();
-      createSpaceEarth();
 
-      try {
-        effect = new StereoEffect(renderer);
-        effect.eyeSeparation = 0.064;
-        effect.setSize(window.innerWidth, window.innerHeight);
-      } catch (error) {
-        state.stereoSupported = false;
-        effect = null;
-        showToast('StereoEffect не поддерживается. Включен обычный режим.');
-      }
-
-      window.addEventListener('resize', onWindowResize);
-      document.addEventListener('visibilitychange', onVisibilityChange);
+      window.addEventListener('resize', onResize);
       animate();
     }
 
-    function createAppPanels() {
-      appDefinitions.forEach((app, index) => {
-        const texture = createPanelTexture(app);
-        const material = new THREE.MeshStandardMaterial({
-          color: 0xffffff,
-          map: texture,
-          roughness: 0.2,
-          metalness: 0.8,
-          transparent: true,
-          opacity: 0.76,
-          emissive: 0x1f2c54,
-          emissiveIntensity: 0.28
-        });
+    function createHandVisuals() {
+      handGroup = new THREE.Group();
+      scene.add(handGroup);
 
-        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(panelSize.width, panelSize.height), material);
-        mesh.position.set(app.x, 1.42, app.z);
-        mesh.userData = {
-          id: app.id,
-          title: app.title,
-          subtitle: app.subtitle,
-          basePosition: mesh.position.clone(),
-          targetZ: app.z,
-          textureCanvas: texture.image,
-          texture: texture,
-          appIndex: index
-        };
-        mesh.name = app.id;
-        scene.add(mesh);
-        appPanels.push(mesh);
+      const sphereMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, transparent: true, opacity: 0.8 });
+      for (let i = 0; i < 5; i++) {
+        const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 12), sphereMaterial);
+        sphere.visible = false;
+        handGroup.add(sphere);
+        handSpheres.push(sphere);
+      }
+
+      const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 2 });
+      for (let i = 0; i < 4; i++) {
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(6);
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const line = new THREE.Line(geometry, lineMaterial);
+        line.visible = false;
+        handGroup.add(line);
+        handLines.push(line);
+      }
+    }
+
+    function updateHands(touches) {
+      if (touches.length === 0) {
+        handSpheres.forEach(s => s.visible = false);
+        handLines.forEach(l => l.visible = false);
+        return;
+      }
+
+      touches.slice(0, 5).forEach((touch, i) => {
+        const x = (touch.clientX / window.innerWidth) * 2 - 1;
+        const y = -(touch.clientY / window.innerHeight) * 2 + 1;
+        const vector = new THREE.Vector3(x, y, 0.5);
+        vector.unproject(camera);
+        const dir = vector.sub(camera.position).normalize();
+        const distance = 0.5;
+        const pos = camera.position.clone().add(dir.multiplyScalar(distance));
+        handSpheres[i].position.copy(pos);
+        handSpheres[i].visible = true;
+      });
+
+      for (let i = 0; i < Math.min(touches.length - 1, 4); i++) {
+        const pos1 = handSpheres[i].position;
+        const pos2 = handSpheres[i + 1].position;
+        const positions = handLines[i].geometry.attributes.position.array;
+        positions[0] = pos1.x; positions[1] = pos1.y; positions[2] = pos1.z;
+        positions[3] = pos2.x; positions[4] = pos2.y; positions[5] = pos2.z;
+        handLines[i].geometry.attributes.position.needsUpdate = true;
+        handLines[i].visible = true;
+      }
+    }
+
+    function createWindow(appType) {
+      const windowDiv = document.createElement('div');
+      windowDiv.className = 'window';
+      windowDiv.innerHTML = `<button class="close-btn">×</button><h2>${getAppTitle(appType)}</h2><p>${getAppContent(appType)}</p>`;
+
+      const windowObject = new CSS2DObject(windowDiv);
+      windowObject.position.set(0, 1.5, -2.5);
+      scene.add(windowObject);
+      windows.push(windowObject);
+
+      windowDiv.querySelector('.close-btn').onclick = () => {
+        scene.remove(windowObject);
+        windows = windows.filter(w => w !== windowObject);
+      };
+
+      windowDiv.addEventListener('touchstart', (e) => {
+        draggingWindow = windowObject;
+        const rect = windowDiv.getBoundingClientRect();
+        dragOffset.set(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top, 0);
+        windowDiv.classList.add('dragging');
+      });
+
+      windowDiv.addEventListener('touchmove', (e) => {
+        if (draggingWindow) {
+          const x = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
+          const y = -(e.touches[0].clientY / window.innerHeight) * 2 + 1;
+          const vector = new THREE.Vector3(x, y, 0.5);
+          vector.unproject(camera);
+          const dir = vector.sub(camera.position).normalize();
+          const pos = camera.position.clone().add(dir.multiplyScalar(2.5));
+          draggingWindow.position.copy(pos);
+        }
+      });
+
+      windowDiv.addEventListener('touchend', () => {
+        draggingWindow = null;
+        windowDiv.classList.remove('dragging');
       });
     }
 
-    function createSpaceEarth() {
-      const earthGeo = new THREE.SphereGeometry(0.28, 32, 32);
-      const earthMat = new THREE.MeshStandardMaterial({ color: 0x577cff, roughness: 0.4, metalness: 0.5, emissive: 0x08294e, emissiveIntensity: 0.3 });
-      const earth = new THREE.Mesh(earthGeo, earthMat);
-      earth.position.set(2.2, 1.75, -3.4);
-      scene.add(earth);
-      state.earth = earth;
+    function getAppTitle(app) {
+      const titles = {
+        youtube: 'YouTube',
+        drawing: 'Рисование',
+        earth: 'Земля',
+        notes: 'Заметки',
+        meditation: 'Медитация',
+        monitor: 'Монитор'
+      };
+      return titles[app] || 'Приложение';
     }
 
-    function createHandVisuals() {
-      const sphereMaterial = new THREE.MeshStandardMaterial({ color: 0x8ad7ff, transparent: true, opacity: 0.88, emissive: 0x288cff, emissiveIntensity: 0.4 });
-      for (let i = 0; i < 5; i += 1) {
-        const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 12), sphereMaterial);
-        sphere.visible = false;
-        scene.add(sphere);
-        handSpheres.push(sphere);
-      }
-      const lineGeo = new THREE.BufferGeometry();
-      const maxPoints = 128;
-      const positions = new Float32Array(maxPoints * 3);
-      lineGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      handLine = new THREE.Line(lineGeo, lineMaterial);
-      handLine.visible = false;
-      scene.add(handLine);
+    function getAppContent(app) {
+      const contents = {
+        youtube: 'Здесь будет плеер YouTube.',
+        drawing: 'Инструменты для рисования.',
+        earth: '3D модель Земли.',
+        notes: 'Ваши заметки.',
+        meditation: 'Релаксация и медитация.',
+        monitor: 'Системная информация.'
+      };
+      return contents[app] || 'Содержимое приложения.';
     }
 
-    function onWindowResize() {
-      if (!camera || !renderer) return;
+    function onResize() {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+      cssRenderer.setSize(window.innerWidth, window.innerHeight);
       if (effect) effect.setSize(window.innerWidth, window.innerHeight);
     }
 
-    function onVisibilityChange() {
-      if (document.hidden) {
-        cancelAnimationFrame(animationId);
-      } else {
-        lastFrameTime = performance.now();
-        animate();
-      }
-    }
-
     function animate() {
-      animationId = requestAnimationFrame(animate);
-      const delta = Math.min(clock.getDelta(), 0.1);
-      updateFPS();
-      updateAppPanels(delta);
-      renderScene();
-    }
-
-    function updateFPS() {
-      const now = performance.now();
-      state.fps = 1000 / (now - lastFrameTime);
-      lastFrameTime = now;
-      fpsSmoothing = fpsSmoothing * 0.92 + state.fps * 0.08;
-      updateMonitorTexture();
-    }
-
-    function updateAppPanels(delta) {
-      appPanels.forEach(panel => {
-        const targetZ = panel.userData.targetZ;
-        panel.position.z += (targetZ - panel.position.z) * Math.min(delta * 6, 1);
-        panel.scale.lerp(new THREE.Vector3(panel.userData.id === state.appSelected ? 1.12 : 1.0, panel.userData.id === state.appSelected ? 1.12 : 1.0, 1), Math.min(delta * 8, 1));
-      });
-      if (state.earth) {
-        state.earth.rotation.y += 0.3 * delta;
-        state.earth.rotation.x = Math.sin(performance.now() * 0.0002) * 0.05;
-      }
-      updateMonitorTexture();
-      if (state.appSelected === 'sculptor') {
-        updateSculptorLine();
-      }
-    }
-
-    function updateMonitorTexture() {
-      const monitor = appPanels.find(panel => panel.userData.id === 'monitor');
-      if (!monitor) return;
-      const canvasTexture = monitor.userData.textureCanvas;
-      const ctx = canvasTexture.getContext('2d');
-      ctx.clearRect(0, 0, canvasTexture.width, canvasTexture.height);
-      ctx.fillStyle = '#0f1a35';
-      ctx.fillRect(0, 0, canvasTexture.width, canvasTexture.height);
-      ctx.fillStyle = 'rgba(255,255,255,0.88)';
-      ctx.font = 'bold 42px sans-serif';
-      ctx.fillText('Монитор системы', 24, 72);
-      ctx.fillStyle = 'rgba(255,255,255,0.68)';
-      ctx.font = '18px sans-serif';
-      ctx.fillText(`FPS: ${Math.round(fpsSmoothing)}`, 26, 126);
-      const batteryLevel = state.battery ? Math.round(state.battery.level * 100) : 'N/A';
-      ctx.fillText(`Батарея: ${batteryLevel}%`, 26, 158);
-      ctx.fillStyle = 'rgba(255,255,255,0.1)';
-      ctx.fillRect(24, 178, 460, 110);
-      ctx.fillStyle = '#84c7ff';
-      ctx.fillRect(34, 188, 420 * Math.min(1, (state.battery?.level ?? 0.5)), 36);
-      monitor.userData.texture.needsUpdate = true;
-    }
-
-    function updateSculptorLine() {
-      if (!state.sculptorPoints.length) {
-        handLine.visible = false;
-        return;
-      }
-      if (state.sculptorPoints.length > 128) {
-        state.sculptorPoints.splice(0, state.sculptorPoints.length - 128);
-      }
-      const positions = handLine.geometry.attributes.position.array;
-      state.sculptorPoints.forEach((point, index) => {
-        positions[index * 3] = point.x;
-        positions[index * 3 + 1] = point.y;
-        positions[index * 3 + 2] = point.z;
-      });
-      handLine.geometry.setDrawRange(0, state.sculptorPoints.length);
-      handLine.geometry.attributes.position.needsUpdate = true;
-      handLine.visible = state.sculptorPoints.length > 1;
-    }
-
-    function renderScene() {
-      if (state.stereoEnabled && effect && state.stereoSupported) {
+      requestAnimationFrame(animate);
+      if (vrActive && effect) {
         effect.render(scene, camera);
       } else {
         renderer.render(scene, camera);
       }
+      cssRenderer.render(scene, camera);
     }
 
-    function handlePointer(rayX, rayY) {
-      raycaster.setFromCamera(new THREE.Vector2(rayX, rayY), camera);
-      const hits = raycaster.intersectObjects(appPanels, false);
-      if (hits.length > 0) {
-        const mesh = hits[0].object;
-        selectPanel(mesh.userData.id);
-      }
-    }
-
-    function selectPanel(panelId) {
-      const panel = appPanels.find(item => item.userData.id === panelId);
-      if (!panel) return;
-      if (state.appSelected === panelId) {
-        showToast(`Открыто ${panel.userData.title}`);
-        return;
-      }
-      state.appSelected = panelId;
-      appPanels.forEach(item => {
-        item.userData.targetZ = item.userData.id === panelId ? -1.5 : item.userData.basePosition.z;
-      });
-      showToast(`Выбран ${panel.userData.title}`);
-    }
-
-
-
-    function updateHandVisuals() {
-      if (!state.touches.length) {
-        handSpheres.forEach(sphere => sphere.visible = false);
-        handLine.visible = false;
-        return;
-      }
-      const ray = new THREE.Ray();
-      const point = new THREE.Vector3();
-      const steps = handSpheres.length;
-      const touch = state.touches[0];
-      const x = (touch.clientX / window.innerWidth) * 2 - 1;
-      const y = -(touch.clientY / window.innerHeight) * 2 + 1;
-      raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
-      ray.copy(raycaster.ray);
-
-      const base = ray.at(0.5, point);
-      for (let i = 0; i < steps; i += 1) {
-        const sphere = handSpheres[i];
-        sphere.visible = true;
-        sphere.position.set(base.x + (i - 2) * 0.04, base.y - Math.abs(i - 2) * 0.02, base.z);
-      }
-
-      const positions = handLine.geometry.attributes.position.array;
-      handSpheres.forEach((sphere, index) => {
-        positions[index * 3] = sphere.position.x;
-        positions[index * 3 + 1] = sphere.position.y;
-        positions[index * 3 + 2] = sphere.position.z;
-      });
-      handLine.geometry.attributes.position.needsUpdate = true;
-      handLine.visible = true;
-    }
-
-    function handlePinchSelection() {
-      if (state.touches.length !== 2) {
-        state.pinchActive = false;
-        state.pinchTriggered = false;
-        return;
-      }
-      const [a, b] = state.touches;
-      const dx = a.clientX - b.clientX;
-      const dy = a.clientY - b.clientY;
-      const distance = Math.hypot(dx, dy);
-      const threshold = 64;
-      if (distance < threshold && !state.pinchTriggered) {
-        state.pinchTriggered = true;
-        handlePointer(0, 0);
-      }
-      state.pinchActive = distance < threshold * 1.5;
-    }
-
-    function onTouchMove(event) {
-      state.touches = Array.from(event.touches);
-      updateHandVisuals();
-      handlePinchSelection();
-      if (state.appSelected === 'sculptor' && event.touches.length === 1) {
-        const touch = event.touches[0];
-        const x = (touch.clientX / window.innerWidth) * 2 - 1;
-        const y = -(touch.clientY / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
-        const point = raycaster.ray.at(0.7, new THREE.Vector3());
-        if (state.sculptorPoints.length > 128) {
-          state.sculptorPoints.shift();
-        }
-        state.sculptorPoints.push(point.clone());
-      }
-      if (state.appSelected !== 'sculptor') {
-        state.sculptorPoints = [];
-      }
-    }
-
-    function onTouchStart(event) {
-      state.touches = Array.from(event.touches);
-      updateHandVisuals();
-      handlePinchSelection();
-    }
-
-    function onTouchEnd(event) {
-      state.touches = Array.from(event.touches);
-      updateHandVisuals();
-      if (!state.touches.length) {
-        state.pinchActive = false;
-        state.pinchTriggered = false;
-      }
-    }
-
-    // iOS Safari support: request permission first
-    window.startCameraWithPermission = async function() {
+    // Event listeners
+    document.getElementById('cameraBtn').onclick = async () => {
       try {
-        // Сначала запрашиваем ЛЮБУЮ камеру для получения разрешения
-        await navigator.mediaDevices.getUserMedia({ video: true });
-        // Потом уже запускаем с нужной камерой
-        await startCamera(state.facingMode);
+        await initCamera(currentCamera);
+        document.getElementById('cameraBtn').style.display = 'none';
+        document.getElementById('switchCamBtn').style.display = 'inline-block';
         initThree();
-      } catch (error) {
-        showToast('Ошибка камеры: ' + error.message);
+      } catch (e) {
+        alert('Ошибка: ' + e.message);
       }
     };
 
-    enableCameraBtn.addEventListener('click', async () => {
+    document.getElementById('switchCamBtn').onclick = async () => {
+      currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
       try {
-        await startCamera(state.facingMode);
-        initThree();
-      } catch (error) {
-        showToast('Ошибка камеры: ' + error.message);
+        await initCamera(currentCamera);
+      } catch (e) {
+        alert('Ошибка переключения: ' + e.message);
       }
+    };
+
+    document.getElementById('vrToggle').onchange = (e) => {
+      vrActive = e.target.checked;
+    };
+
+    document.querySelectorAll('.app-icon').forEach(icon => {
+      icon.onclick = () => {
+        createWindow(icon.dataset.app);
+      };
     });
 
-    switchCameraBtn.addEventListener('click', async () => {
-      if (!state.stream) return;
-      state.facingMode = state.facingMode === 'environment' ? 'user' : 'environment';
-      try {
-        await startCamera();
-        showToast(`Камера: ${state.facingMode === 'environment' ? 'задняя' : 'фронтальная'}`);
-      } catch (error) {
-        showToast('Не удалось переключить камеру');
-      }
-    });
-
-    vrToggleBtn.addEventListener('click', () => {
-      state.stereoEnabled = !state.stereoEnabled;
-      showToast(`VR ${state.stereoEnabled ? 'включён' : 'выключен'}`);
-    });
-
-    resetBtn.addEventListener('click', () => {
-      state.appSelected = null;
-      appPanels.forEach(panel => panel.userData.targetZ = panel.userData.basePosition.z);
-      showToast('Вид сброшен');
-    });
-
-    canvas.addEventListener('touchstart', onTouchStart, { passive: true });
-    canvas.addEventListener('touchmove', onTouchMove, { passive: true });
-    canvas.addEventListener('touchend', onTouchEnd, { passive: true });
-    canvas.addEventListener('touchcancel', onTouchEnd, { passive: true });
-    canvas.addEventListener('click', event => {
-      const rect = canvas.getBoundingClientRect();
-      const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-      handlePointer(x, y);
-    });
-
-    if (navigator.getBattery) {
-      navigator.getBattery().then(battery => {
-        state.battery = battery;
-        battery.addEventListener('levelchange', () => { state.battery = battery; });
-      }).catch(() => { state.battery = null; });
-    }
-
-    console.log('Vision Pro Cardboard VR initialized');
+    document.addEventListener('touchstart', (e) => updateHands(e.touches));
+    document.addEventListener('touchmove', (e) => updateHands(e.touches));
+    document.addEventListener('touchend', (e) => updateHands(e.touches));
   </script>
 </body>
 </html>
