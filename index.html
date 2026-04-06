@@ -1,398 +1,1245 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>VisionOS Cardboard VR Final</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      position: fixed;
-      top: 0;
-      left: 0;
-      background: #000;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 16px;
-    }
-  </style>
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
-        "three/addons/effects/StereoEffect.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/effects/StereoEffect.js"
-      }
-    }
-  </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Vision Pro AR</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --glass:rgba(18,18,28,0.7);
+  --glass-b:rgba(255,255,255,0.18);
+  --glass-s:rgba(0,0,0,0.5);
+  --accent:#3b9eff;
+  --accent2:#a78bfa;
+  --text:rgba(255,255,255,0.95);
+  --text-dim:rgba(255,255,255,0.55);
+  --hi:rgba(80,180,255,0.55);
+}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;
+  font-family:-apple-system,'SF Pro Display','Helvetica Neue',sans-serif;
+  -webkit-font-smoothing:antialiased}
+
+/* ── Canvas ── */
+#c{position:fixed;inset:0;z-index:1}
+
+/* ── VR divider ── */
+#vr-div{display:none;position:fixed;left:50%;top:0;width:3px;height:100%;
+  background:linear-gradient(to bottom,transparent,#000 20%,#000 80%,transparent);
+  z-index:800;pointer-events:none}
+
+/* ── Reticle ── */
+#ret{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:28px;height:28px;z-index:50;pointer-events:none;display:none}
+#ret svg{width:100%;height:100%}
+#ret-progress{position:absolute;inset:-8px;border-radius:50%;
+  background:conic-gradient(rgba(80,180,255,0.9) 0%,transparent 0%);
+  transition:none}
+
+/* ── Touch hands overlay ── */
+#hands-canvas{position:fixed;inset:0;z-index:40;pointer-events:none;display:none}
+
+/* ── Perm screen ── */
+#perm{position:fixed;inset:0;z-index:900;
+  background:radial-gradient(ellipse at 25% 35%,#0d1b3e 0%,#000 65%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:22px;padding:40px}
+#perm.off{display:none}
+.p-logo{width:96px;height:96px;border-radius:30px;
+  background:linear-gradient(135deg,rgba(59,158,255,0.3),rgba(167,139,250,0.15));
+  border:1px solid rgba(255,255,255,0.25);
+  display:flex;align-items:center;justify-content:center;font-size:50px;
+  box-shadow:0 0 60px rgba(59,158,255,0.2),inset 0 1px 0 rgba(255,255,255,0.15);
+  animation:floatY 3s ease-in-out infinite}
+@keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.p-title{font-size:30px;font-weight:700;color:#fff;letter-spacing:-0.5px}
+.p-sub{font-size:14px;color:rgba(255,255,255,0.5);text-align:center;
+  line-height:1.7;max-width:290px}
+.p-btn{padding:15px 40px;
+  background:linear-gradient(135deg,rgba(59,158,255,0.4),rgba(167,139,250,0.25));
+  border:1px solid rgba(255,255,255,0.35);border-radius:50px;
+  color:#fff;font-size:17px;font-weight:600;cursor:pointer;
+  backdrop-filter:blur(10px);transition:all .2s;
+  box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+.p-btn:active{transform:scale(.95)}
+.p-err{font-size:13px;color:#ff6b6b;text-align:center;max-width:280px;display:none}
+.p-features{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:4px}
+.feat{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+  border-radius:20px;padding:6px 14px;font-size:12px;color:rgba(255,255,255,0.6)}
+
+/* ── HUD bar ── */
+#hud{position:fixed;bottom:0;left:0;right:0;z-index:60;
+  padding:12px 20px 18px;
+  background:linear-gradient(to top,rgba(0,0,0,0.7),transparent);
+  display:none;align-items:center;justify-content:space-between;gap:10px}
+#hud.vis{display:flex}
+.hud-pill{background:rgba(0,0,0,0.5);backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,0.12);border-radius:30px;
+  padding:8px 16px;display:flex;align-items:center;gap:8px}
+.hud-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);
+  border-radius:22px;padding:8px 16px;
+  color:#fff;font-size:13px;font-weight:500;cursor:pointer;
+  white-space:nowrap;transition:all .2s}
+.hud-btn:active{background:rgba(255,255,255,0.2)}
+.hud-btn.active{background:rgba(59,158,255,0.3);border-color:rgba(59,158,255,0.6)}
+.toggle-sw{width:40px;height:24px;background:rgba(255,255,255,0.15);
+  border-radius:12px;position:relative;cursor:pointer;
+  border:1px solid rgba(255,255,255,0.2);transition:background .3s}
+.toggle-sw.on{background:rgba(59,158,255,0.8)}
+.toggle-sw::after{content:'';position:absolute;left:3px;top:3px;
+  width:16px;height:16px;background:#fff;border-radius:50%;
+  transition:transform .3s;box-shadow:0 2px 4px rgba(0,0,0,0.3)}
+.toggle-sw.on::after{transform:translateX(16px)}
+.sep-label{font-size:11px;color:rgba(255,255,255,0.5)}
+#sep-slider{-webkit-appearance:none;width:70px;height:3px;
+  border-radius:2px;background:rgba(255,255,255,0.2);outline:none}
+#sep-slider::-webkit-slider-thumb{-webkit-appearance:none;
+  width:16px;height:16px;border-radius:50%;
+  background:rgba(255,255,255,0.9);box-shadow:0 2px 6px rgba(0,0,0,0.4)}
+
+/* ── Notif toast ── */
+#toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);
+  z-index:700;background:rgba(0,0,0,0.7);backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,0.15);border-radius:30px;
+  padding:10px 22px;font-size:13px;color:rgba(255,255,255,0.85);
+  white-space:nowrap;opacity:0;transition:opacity .3s;pointer-events:none}
+#toast.show{opacity:1}
+
+/* ── Landscape lock ── */
+#land{display:none;position:fixed;inset:0;z-index:1000;background:#000;
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;color:#fff}
+#land.show{display:flex}
+.rot-icon{font-size:64px;animation:rotA 2s ease-in-out infinite}
+@keyframes rotA{0%,100%{transform:rotate(0)}50%{transform:rotate(90deg)}}
+
+/* ── Hand dot ── */
+.h-dot{position:absolute;width:16px;height:16px;border-radius:50%;
+  background:radial-gradient(circle,rgba(80,200,255,.9),rgba(80,200,255,.3));
+  transform:translate(-50%,-50%);pointer-events:none;
+  box-shadow:0 0 12px rgba(80,200,255,.6)}
+.h-pinch{background:radial-gradient(circle,rgba(255,120,80,.9),rgba(255,80,40,.3));
+  box-shadow:0 0 20px rgba(255,100,60,.8)}
+
+/* ── Loading ── */
+#loading{position:fixed;inset:0;z-index:880;background:#000;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;transition:opacity .5s}
+#loading.off{opacity:0;pointer-events:none}
+.spin{width:36px;height:36px;border:2px solid rgba(255,255,255,.1);
+  border-top-color:rgba(59,158,255,.9);border-radius:50%;
+  animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-t{font-size:14px;color:rgba(255,255,255,.5)}
+</style>
 </head>
 <body>
-  <script type="module">
-    import * as THREE from 'three';
-    import { StereoEffect } from 'three/addons/effects/StereoEffect.js';
 
-    console.log('VisionOS Cardboard VR Final starting...');
+<!-- Landscape prompt -->
+<div id="land">
+  <div class="rot-icon">📱</div>
+  <div style="font-size:20px;font-weight:700">Поверните телефон</div>
+  <div style="font-size:14px;color:rgba(255,255,255,.5)">Нужна альбомная ориентация</div>
+</div>
 
-    // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
-    let scene, camera, renderer, effect, vrMode = false;
-    let windows = [];
-    let fingers = [];
-    let activeTouches = [];
+<!-- Permission screen -->
+<div id="perm">
+  <div class="p-logo">👁</div>
+  <div class="p-title">Vision Pro AR</div>
+  <div class="p-sub">Пространственный интерфейс будущего.<br>Требуется доступ к камере телефона.</div>
+  <div class="p-features">
+    <span class="feat">📷 Задняя камера</span>
+    <span class="feat">🕶️ VR Cardboard</span>
+    <span class="feat">✋ Трекинг рук</span>
+    <span class="feat">🌍 6 приложений</span>
+  </div>
+  <button class="p-btn" id="cam-btn">Разрешить камеру</button>
+  <div class="p-err" id="p-err"></div>
+</div>
 
-    // КАМЕРА НА iOS — ЕБАНЫЙ РУКОВОДСТВО
-    (function setupCamera() {
-        console.log('ЕБАНЫЙ КОД КАМЕРЫ ЗАГРУЖАЕТСЯ');
-        
-        // СОЗДАЁМ ВИДЕОЭЛЕМЕНТ
-        const videoElement = document.createElement('video');
-        videoElement.id = 'bgVideo';
-        videoElement.setAttribute('autoplay', '');
-        videoElement.setAttribute('playsinline', ''); // БЕЗ ЭТОГО НИХУЯ НЕ РАБОТАЕТ НА iOS
-        videoElement.setAttribute('muted', '');
-        videoElement.muted = true;
-        videoElement.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0;';
-        
-        // ВСТАВЛЯЕМ В НАЧАЛО BODY
-        if (document.body.firstChild) {
-            document.body.insertBefore(videoElement, document.body.firstChild);
-        } else {
-            document.body.appendChild(videoElement);
-        }
-        
-        let currentStream = null;
-        let currentCamera = 'environment'; // ЗАДНЯЯ, БЛЯТЬ
-        
-        // ФУНКЦИЯ ЗАПУСКА КАМЕРЫ — СИНХРОННАЯ, БЕЗ ЕБАНЫХ ASYNC/AWAIT
-        window.startCamera = function() {
-            console.log('ПЫТАЮСЬ ВКЛЮЧИТЬ КАМЕРУ, БЛЯТЬ');
-            
-            // ОСТАНАВЛИВАЕМ СТАРЫЙ ПОТОК
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-                currentStream = null;
-            }
-            
-            // iOS ХОЧЕТ ТАКИЕ НАСТРОЙКИ
-            const constraints = {
-                video: {
-                    facingMode: { exact: currentCamera },
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                }
-            };
-            
-            // ЗАПУСКАЕМ КАМЕРУ, БЛЯТЬ
-            navigator.mediaDevices.getUserMedia(constraints)
-                .then(function(stream) {
-                    console.log('КАМЕРА РАБОТАЕТ, ЕБАТЬ КОЛОТИТЬ');
-                    currentStream = stream;
-                    videoElement.srcObject = stream;
-                    videoElement.play().catch(function(e) {
-                        console.log('PLAY ERROR:', e);
-                        videoElement.play();
-                    });
-                    
-                    // МЕНЯЕМ КНОПКИ
-                    const camBtn = document.getElementById('cameraBtn');
-                    const switchBtn = document.getElementById('switchCamBtn');
-                    if (camBtn) camBtn.style.display = 'none';
-                    if (switchBtn) switchBtn.style.display = 'inline-block';
-                })
-                .catch(function(err) {
-                    console.error('ОШИБКА КАМЕРЫ, БЛЯТЬ:', err);
-                    // ПРОБУЕМ БЕЗ exact — ЕБАНЫЙ FALLBACK
-                    navigator.mediaDevices.getUserMedia({ video: { facingMode: currentCamera } })
-                        .then(function(stream) {
-                            console.log('FALLBACK СРАБОТАЛ, УРА, БЛЯТЬ');
-                            currentStream = stream;
-                            videoElement.srcObject = stream;
-                            videoElement.play();
-                        })
-                        .catch(function(err2) {
-                            console.error('ВСЁ ПЛОХО, БЛЯТЬ:', err2);
-                            alert('НЕ МОГУ ВКЛЮЧИТЬ КАМЕРУ. ПРОВЕРЬ РАЗРЕШЕНИЯ В НАСТРОЙКАХ SAFARI, БЛЯТЬ.');
-                        });
-                });
-        };
-        
-        // ПЕРЕКЛЮЧЕНИЕ КАМЕРЫ
-        window.switchCamera = function() {
-            console.log('ПЕРЕКЛЮЧАЮ КАМЕРУ, БЛЯТЬ');
-            currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
-            startCamera();
-        };
-    })();
+<!-- Loading -->
+<div id="loading">
+  <div class="spin"></div>
+  <div class="load-t" id="load-msg">Инициализация...</div>
+</div>
 
-    // СОЗДАЁМ КНОПКИ ЕБАНЫЕ
-    const btnContainer = document.createElement('div');
-    btnContainer.style.cssText = 'position: fixed; bottom: 30px; left: 0; right: 0; display: flex; justify-content: center; gap: 15px; z-index: 100;';
+<!-- Main -->
+<canvas id="c"></canvas>
+<canvas id="hands-canvas"></canvas>
+<div id="vr-div"></div>
+<div id="ret">
+  <div id="ret-progress"></div>
+  <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="14" cy="14" r="2" fill="rgba(255,255,255,0.9)"/>
+    <line x1="14" y1="2" x2="14" y2="8" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="14" y1="20" x2="14" y2="26" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="2" y1="14" x2="8" y2="14" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="20" y1="14" x2="26" y2="14" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>
+</div>
 
-    const cameraButton = document.createElement('button');
-    cameraButton.id = 'cameraBtn';
-    cameraButton.textContent = '📷 ВКЛЮЧИТЬ КАМЕРУ, БЛЯТЬ';
-    cameraButton.style.cssText = 'padding: 15px 30px; background: rgba(0,0,0,0.8); color: white; border: none; border-radius: 50px; font-size: 18px; font-weight: bold; backdrop-filter: blur(10px);';
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-pill">
+    <button class="hud-btn" id="cam-flip-btn" title="Переключить камеру">🔄 Камера</button>
+    <button class="hud-btn" id="reset-btn">⊕ Сброс</button>
+  </div>
+  <div class="hud-pill">
+    <span style="font-size:12px;color:rgba(255,255,255,.6)">VR</span>
+    <div class="toggle-sw" id="vr-tog" onclick="toggleVR()"></div>
+  </div>
+  <div class="hud-pill" id="sep-wrap" style="display:none">
+    <span class="sep-label">Separation</span>
+    <input type="range" id="sep-slider" min="0" max="100" value="32">
+  </div>
+  <div class="hud-pill">
+    <span style="font-size:12px;color:rgba(255,255,255,.6)">Руки</span>
+    <div class="toggle-sw" id="hand-tog" onclick="toggleHands()"></div>
+  </div>
+</div>
 
-    const switchButton = document.createElement('button');
-    switchButton.id = 'switchCamBtn';
-    switchButton.textContent = '🔄 ПЕРЕКЛЮЧИТЬ, БЛЯТЬ';
-    switchButton.style.cssText = 'padding: 15px 30px; background: rgba(0,0,0,0.8); color: white; border: none; border-radius: 50px; font-size: 18px; font-weight: bold; backdrop-filter: blur(10px); display: none;';
+<!-- Toast -->
+<div id="toast"></div>
 
-    const vrToggle = document.createElement('button');
-    vrToggle.id = 'vrToggleBtn';
-    vrToggle.textContent = '🥽 VR РЕЖИМ, БЛЯТЬ';
-    vrToggle.style.cssText = 'padding: 15px 30px; background: rgba(0,0,0,0.8); color: white; border: none; border-radius: 50px; font-size: 18px; font-weight: bold; backdrop-filter: blur(10px);';
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/effects/StereoEffect.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════
+   VISION PRO AR — FULL EXPERIENCE
+   ══════════════════════════════════════════════════════════════ */
 
-    btnContainer.appendChild(cameraButton);
-    btnContainer.appendChild(switchButton);
-    btnContainer.appendChild(vrToggle);
-    document.body.appendChild(btnContainer);
+const $ = id => document.getElementById(id);
 
-    // НАЗНАЧАЕМ ОБРАБОТЧИКИ — БЕЗ ВСЯКОЙ ЕБАНОЙ АСИНХРОННОСТИ
-    cameraButton.onclick = function() {
-        console.log('КНОПКА НАЖАТА, ЕБУЧИЙ В РОТ');
-        startCamera();
-    };
+/* ─── State ─── */
+const S = {
+  vrMode: false,
+  handsMode: false,
+  separation: 0.032,
+  focusPanel: -1,
+  focusTimer: 0,
+  gazeStart: 0,
+  openApp: -1,
+  camFacing: 'environment',
+  stream: null,
+  gyroEnabled: false,
+  smoothAlpha: 0, smoothBeta: 0,
+  targetAlpha: 0, targetBeta: 0,
+  gamma: 0,
+  fps: 60, frameCount: 0, lastFPS: performance.now(),
+  pinching: false, pinchPos: {x:0,y:0},
+  touches: [],
+  audioCtx: null,
+};
 
-    switchButton.onclick = function() {
-        console.log('ПЕРЕКЛЮЧАЮ, БЛЯТЬ');
-        switchCamera();
-    };
+/* ─── Audio ─── */
+function initAudio() {
+  if(S.audioCtx) return;
+  S.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function playClick(freq=880, dur=0.05) {
+  if(!S.audioCtx) return;
+  const o = S.audioCtx.createOscillator();
+  const g = S.audioCtx.createGain();
+  o.connect(g); g.connect(S.audioCtx.destination);
+  o.frequency.value = freq;
+  o.type = 'sine';
+  g.gain.setValueAtTime(0.15, S.audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, S.audioCtx.currentTime + dur);
+  o.start(); o.stop(S.audioCtx.currentTime + dur);
+}
+function playHover() { playClick(660, 0.03); }
 
-    // VR РЕЖИМ — ЕЩЁ ОДНА ЕБАНАЯ ТЕМА
-    function initThreeJS() {
-        scene = new THREE.Scene();
-        scene.background = null; // ПРОЗРАЧНЫЙ, ЧТОБЫ ВИДНО БЫЛО КАМЕРУ
-        
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.6, 0);
-        
-        renderer = new THREE.WebGLRenderer({ alpha: true }); // alpha true — ПРОЗРАЧНЫЙ
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setClearColor(0x000000, 0); // ПОЛНОСТЬЮ ПРОЗРАЧНЫЙ
-        document.body.appendChild(renderer.domElement);
-        renderer.domElement.style.position = 'fixed';
-        renderer.domElement.style.top = '0';
-        renderer.domElement.style.left = '0';
-        renderer.domElement.style.zIndex = '1';
-        renderer.domElement.style.pointerEvents = 'none'; // ЧТОБЫ КНОПКИ БЫЛИ ДОСТУПНЫ
-        
-        effect = new StereoEffect(renderer);
-        effect.eyeSeparation = 0.064; // НЕ МЕНЯТЬ, БЛЯТЬ
-    }
+/* ─── Toast ─── */
+let toastTimer;
+function toast(msg, dur=2500) {
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), dur);
+}
 
-    function toggleVR(enable) {
-        vrMode = enable;
-        if (vrMode) {
-            effect.setSize(window.innerWidth, window.innerHeight);
-        }
-    }
+/* ─── Three.js core ─── */
+let scene, camera, renderer, stereoEffect, videoTex, bgMesh;
+let clock = new THREE.Clock();
+let raycaster, hitPoint = new THREE.Vector2(0,0);
+let euler = new THREE.Euler(0,0,0,'YXZ');
+let qTarget = new THREE.Quaternion();
+const panels = [], panelGroups = [];
 
-    function animate() {
-        if (vrMode) {
-            effect.render(scene, camera);
-        } else {
-            renderer.render(scene, camera);
-        }
-        requestAnimationFrame(animate);
-    }
+function initThree(video) {
+  scene = new THREE.Scene();
 
-    vrToggle.onclick = function() {
-        vrMode = !vrMode;
-        this.textContent = vrMode ? '❌ ВЫКЛЮЧИТЬ VR, БЛЯТЬ' : '🥽 VR РЕЖИМ, БЛЯТЬ';
-        toggleVR(vrMode);
-        console.log('VR РЕЖИМ:', vrMode ? 'ВКЛЮЧЕН' : 'ВЫКЛЮЧЕН');
-    };
+  camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.05, 500);
+  camera.position.set(0, 0, 0);
 
-    // ОКНА ПРИЛОЖЕНИЙ — С КРЕСТИКОМ, БЛЯТЬ
-    function createAppWindow(title, color, x, y, z) {
-        const group = new THREE.Group();
-        
-        // ОСНОВНАЯ ПАНЕЛЬ
-        const geometry = new THREE.BoxGeometry(1.2, 0.8, 0.05);
-        const material = new THREE.MeshStandardMaterial({
-            color: color,
-            transparent: true,
-            opacity: 0.85,
-            metalness: 0.7,
-            roughness: 0.2,
-            emissive: 0x111111
-        });
-        const panel = new THREE.Mesh(geometry, material);
-        group.add(panel);
-        
-        // РАМКА БЕЛАЯ (ДЛЯ КРАСОТЫ)
-        const edgesGeo = new THREE.EdgesGeometry(geometry);
-        const edgesMat = new THREE.LineBasicMaterial({ color: 0xffffff });
-        const wireframe = new THREE.LineSegments(edgesGeo, edgesMat);
-        group.add(wireframe);
-        
-        // ТЕКСТ ЗАГОЛОВКА (ЧЕРЕЗ CANVAS ТЕКСТУРУ)
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'Bold 32px Arial';
-        ctx.fillText(title, 20, 50);
-        const texture = new THREE.CanvasTexture(canvas);
-        const textMat = new THREE.MeshStandardMaterial({ map: texture, side: THREE.DoubleSide });
-        const textPlane = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.2), textMat);
-        textPlane.position.set(0, 0.25, 0.03);
-        group.add(textPlane);
-        
-        // ЕБАНЫЙ КРЕСТИК ДЛЯ ЗАКРЫТИЯ
-        const closeBtnGeo = new THREE.SphereGeometry(0.08, 16, 16);
-        const closeBtnMat = new THREE.MeshStandardMaterial({ color: 0xff3333, emissive: 0x441111 });
-        const closeButton = new THREE.Mesh(closeBtnGeo, closeBtnMat);
-        closeButton.position.set(0.55, 0.35, 0.04);
-        closeButton.userData = { type: 'closeButton', parentWindow: group };
-        group.add(closeButton);
-        
-        group.position.set(x, y, z);
-        scene.add(group);
-        windows.push(group);
-        
-        return group;
-    }
+  renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = false;
 
-    // ОБРАБОТЧИК КЛИКОВ ДЛЯ ЗАКРЫТИЯ ОКОН
-    window.addEventListener('click', function(event) {
-        // НЕ РАБОТАЕМ, ЕСЛИ КЛИК ПО КНОПКЕ
-        if (event.target && event.target.id) return;
-        
-        const mouse = new THREE.Vector2();
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        
-        const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(mouse, camera);
-        
-        const intersects = raycaster.intersectObjects(scene.children, true);
-        
-        for (let i = 0; i < intersects.length; i++) {
-            const hit = intersects[i];
-            if (hit.object.userData && hit.object.userData.type === 'closeButton') {
-                const windowGroup = hit.object.userData.parentWindow;
-                // УДАЛЯЕМ ОКНО ИЗ СЦЕНЫ
-                scene.remove(windowGroup);
-                // УДАЛЯЕМ ИЗ МАССИВА
-                const index = windows.indexOf(windowGroup);
-                if (index > -1) windows.splice(index, 1);
-                console.log('ОКНО ЗАКРЫТО, БЛЯТЬ');
-                break;
-            }
-        }
+  /* StereoEffect — Three.js built-in, wraps renderer */
+  stereoEffect = new THREE.StereoEffect(renderer);
+  stereoEffect.eyeSeparation = S.separation;
+  stereoEffect.setSize(window.innerWidth, window.innerHeight);
+
+  /* Video background */
+  videoTex = new THREE.VideoTexture(video);
+  videoTex.minFilter = THREE.LinearFilter;
+  videoTex.magFilter = THREE.LinearFilter;
+
+  const bgGeo = new THREE.SphereGeometry(100,32,16);
+  const bgMat = new THREE.MeshBasicMaterial({map:videoTex,side:THREE.BackSide});
+  bgMesh = new THREE.Mesh(bgGeo,bgMat);
+  scene.add(bgMesh);
+
+  /* Ambient */
+  scene.add(new THREE.AmbientLight(0xffffff,0.6));
+  const dLight = new THREE.DirectionalLight(0xffffff,0.8);
+  dLight.position.set(5,10,5);
+  scene.add(dLight);
+
+  /* Virtual floor */
+  const floorGeo = new THREE.PlaneGeometry(20,20,20,20);
+  const floorMat = new THREE.MeshBasicMaterial({
+    color:0x1a2a4a, transparent:true, opacity:0.15,
+    wireframe:true
+  });
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI/2;
+  floor.position.y = -1.5;
+  scene.add(floor);
+
+  raycaster = new THREE.Raycaster();
+
+  createApps();
+  animate();
+  window.addEventListener('resize', onResize);
+}
+
+function onResize() {
+  if (!renderer) return;
+  const W = window.innerWidth, H = window.innerHeight;
+  camera.aspect = W / H;
+  camera.updateProjectionMatrix();
+  renderer.setSize(W, H);
+  if (stereoEffect) stereoEffect.setSize(W, H);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   APPS — 6 windows in semicircle
+   ══════════════════════════════════════════════════════════════ */
+const APP_DEFS = [
+  { id:'clock',   emoji:'🕐', title:'Время & Погода', color:[0.15,0.35,0.8] },
+  { id:'youtube', emoji:'🎬', title:'Кинозал',         color:[0.8,0.1,0.1]  },
+  { id:'earth',   emoji:'🌍', title:'Планета Земля',   color:[0.1,0.5,0.3]  },
+  { id:'notes',   emoji:'📝', title:'Заметки',         color:[0.7,0.55,0.1] },
+  { id:'meditate',emoji:'🧘', title:'Медитация',       color:[0.4,0.15,0.75]},
+  { id:'monitor', emoji:'📊', title:'Монитор',         color:[0.1,0.6,0.6]  },
+];
+
+const APP_RADIUS = 3.2;
+const APP_ANGLES = [-70,-38,-10,10,38,70]; // degrees horizontal
+const W = 1.4, H = 0.9;
+
+function createApps() {
+  APP_DEFS.forEach((def, i) => {
+    const group = new THREE.Group();
+    const angle = THREE.MathUtils.degToRad(APP_ANGLES[i]);
+    group.position.set(
+      Math.sin(angle) * APP_RADIUS,
+      0.1,
+      -Math.cos(angle) * APP_RADIUS
+    );
+    group.rotation.y = -angle;
+    group.userData = { appIdx: i, focused: false, open: false, canvas: null, tex: null };
+
+    /* Panel canvas */
+    const { canvas: cvs, tex } = makeAppCanvas(def, i);
+    group.userData.canvas = cvs;
+    group.userData.tex = tex;
+
+    /* Main mesh */
+    const geo = new THREE.PlaneGeometry(W, H);
+    const mat = new THREE.MeshBasicMaterial({ map:tex, transparent:true, side:THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.userData.panelIdx = i;
+    group.add(mesh);
+
+    /* Glow border */
+    const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(W+0.01, H+0.01, 0.001));
+    const edgeMat = new THREE.LineBasicMaterial({
+      color: new THREE.Color(...def.color),
+      transparent: true, opacity: 0.5
     });
+    group.add(new THREE.LineSegments(edgeGeo, edgeMat));
+    group.userData.edge = edgeMat;
 
-    // МЕНЮ ПРИЛОЖЕНИЙ
-    const appMenu = document.createElement('div');
-    appMenu.style.cssText = 'position: fixed; bottom: 100px; left: 0; right: 0; display: flex; justify-content: center; gap: 15px; z-index: 100; flex-wrap: wrap; padding: 10px;';
+    /* Scale in anim */
+    group.scale.set(0.01,0.01,0.01);
+    scene.add(group);
+    panelGroups.push(group);
+    panels.push(mesh);
 
-    const apps = [
-        { name: '🎬 YouTube', color: 0xff3333, title: 'YOUTUBE' },
-        { name: '✏️ РИСОВАНИЕ', color: 0x33ff33, title: 'РИСУЙ' },
-        { name: '🌍 КОСМОС', color: 0x3333ff, title: 'ЗЕМЛЯ' },
-        { name: '📝 ЗАМЕТКИ', color: 0xffaa33, title: 'ЗАМЕТКИ' },
-        { name: '🧘 МЕДИТАЦИЯ', color: 0xaa33ff, title: 'МММ' },
-        { name: '📊 МОНИТОР', color: 0x33ffaa, title: 'FPS' }
-    ];
+    animScale(group, 0.01, 1, 700, i*130);
+  });
 
-    apps.forEach((app, index) => {
-        const btn = document.createElement('button');
-        btn.textContent = app.name;
-        btn.style.cssText = 'padding: 12px 20px; background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 40px; font-size: 16px; backdrop-filter: blur(10px);';
-        btn.onclick = function() {
-            const angle = (index / apps.length) * Math.PI * 2;
-            const x = Math.sin(angle) * 1.5;
-            const z = -2.5 + Math.cos(angle) * 0.5;
-            createAppWindow(app.title, app.color, x, 1, z);
-            console.log('ОКНО ОТКРЫТО, ЕБАТЬ:', app.name);
-        };
-        appMenu.appendChild(btn);
-    });
+  // App-specific 3D extras
+  createEarth();
+  createMeditationParticles();
+}
 
-    document.body.appendChild(appMenu);
+/* ─── Canvas textures ─── */
+function makeAppCanvas(def, idx) {
+  const cvs = document.createElement('canvas');
+  cvs.width = 512; cvs.height = 320;
+  const tex = new THREE.CanvasTexture(cvs);
+  drawAppBase(cvs, def, idx);
+  return { canvas: cvs, tex };
+}
 
-    // РУКИ — ПРИ КАСАНИИ ЭКРАНА
-    const handGroup = new THREE.Group();
-    scene.add(handGroup);
+function drawAppBase(cvs, def, idx) {
+  const ctx = cvs.getContext('2d');
+  const [r,g,b] = def.color;
+  ctx.clearRect(0,0,512,320);
 
-    const fingerColors = [0xff8888, 0xffaa88, 0xffcc88, 0x88ff88, 0x88aaff];
+  /* Glass bg */
+  const grad = ctx.createLinearGradient(0,0,0,320);
+  grad.addColorStop(0, `rgba(${Math.round(r*40)},${Math.round(g*40)},${Math.round(b*80)},0.85)`);
+  grad.addColorStop(1, `rgba(${Math.round(r*20)},${Math.round(g*20)},${Math.round(b*40)},0.92)`);
+  rrect(ctx,0,0,512,320,36);
+  ctx.fillStyle = grad; ctx.fill();
 
-    for (let i = 0; i < 5; i++) {
-        const sphere = new THREE.Mesh(
-            new THREE.SphereGeometry(0.07, 16, 16),
-            new THREE.MeshStandardMaterial({ color: fingerColors[i], emissive: 0x331100 })
-        );
-        sphere.position.set(i * 0.1 - 0.2, 0, 0);
-        handGroup.add(sphere);
-        fingers.push(sphere);
+  /* Border */
+  ctx.strokeStyle = `rgba(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)},0.5)`;
+  ctx.lineWidth = 2;
+  rrect(ctx,1,1,510,318,35); ctx.stroke();
+
+  /* Top bar */
+  ctx.fillStyle = `rgba(${Math.round(r*80)},${Math.round(g*80)},${Math.round(b*120)},0.6)`;
+  rrect(ctx,0,0,512,52,35); ctx.fill();
+
+  /* Dots */
+  [[16,26,'#ff5f57'],[40,26,'#ffbd2e'],[64,26,'#28c840']].forEach(([x,y,c])=>{
+    ctx.beginPath(); ctx.arc(x,y,8,0,Math.PI*2);
+    ctx.fillStyle=c; ctx.fill();
+  });
+
+  /* Title */
+  ctx.font = 'bold 20px -apple-system,Helvetica';
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.textAlign = 'center';
+  ctx.fillText(def.emoji + '  ' + def.title, 256, 34);
+
+  return ctx;
+}
+
+/* Clock app */
+let clockCanvas, clockTex;
+function updateClockApp() {
+  const def = APP_DEFS[0];
+  const cvs = panelGroups[0]?.userData?.canvas;
+  if(!cvs) return;
+  const ctx = cvs.getContext('2d');
+  drawAppBase(cvs, def, 0);
+
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mm = String(now.getMinutes()).padStart(2,'0');
+  const ss = String(now.getSeconds()).padStart(2,'0');
+  const days=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+  const months=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  const dateStr = `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]}`;
+
+  ctx.textAlign='center';
+
+  /* Big clock */
+  ctx.font='bold 88px -apple-system,Helvetica';
+  ctx.fillStyle='rgba(255,255,255,0.97)';
+  ctx.fillText(`${hh}:${mm}`, 256, 175);
+
+  ctx.font='36px -apple-system,Helvetica';
+  ctx.fillStyle='rgba(255,255,255,0.5)';
+  ctx.fillText(`:${ss}`, 390, 155);
+
+  ctx.font='22px -apple-system,Helvetica';
+  ctx.fillStyle='rgba(255,255,255,0.65)';
+  ctx.fillText(dateStr, 256, 208);
+
+  /* Weather */
+  ctx.font='42px serif';
+  ctx.fillText('⛅', 168, 272);
+  ctx.font='bold 32px -apple-system,Helvetica';
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  ctx.fillText('25°C', 256, 268);
+  ctx.font='18px -apple-system,Helvetica';
+  ctx.fillStyle='rgba(255,255,255,0.6)';
+  ctx.fillText('Переменная облачность', 256, 295);
+
+  if(panelGroups[0]?.userData?.tex) panelGroups[0].userData.tex.needsUpdate=true;
+}
+
+/* YouTube app */
+function drawYoutubeApp() {
+  const def=APP_DEFS[1], cvs=panelGroups[1]?.userData?.canvas;
+  if(!cvs) return;
+  const ctx=cvs.getContext('2d');
+  drawAppBase(cvs,def,1);
+
+  /* Thumbnail placeholder */
+  const g=ctx.createLinearGradient(0,60,0,290);
+  g.addColorStop(0,'#111'); g.addColorStop(1,'#222');
+  rrect(ctx,16,60,480,220,16); ctx.fillStyle=g; ctx.fill();
+
+  /* Play button */
+  ctx.beginPath();
+  ctx.moveTo(226,155); ctx.lineTo(226,195); ctx.lineTo(286,175);
+  ctx.closePath();
+  ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fill();
+
+  ctx.font='16px -apple-system,Helvetica';
+  ctx.fillStyle='rgba(255,255,255,0.6)';
+  ctx.textAlign='center';
+  ctx.fillText('🦁 Wildlife 4K — коснитесь для воспроизведения', 256, 298);
+  if(panelGroups[1]?.userData?.tex) panelGroups[1].userData.tex.needsUpdate=true;
+}
+
+/* Earth 3D */
+let earthMesh, earthGroup;
+function createEarth() {
+  earthGroup = new THREE.Group();
+  const pg = panelGroups[2];
+  earthGroup.position.copy(pg.position);
+  earthGroup.position.z -= 0.2;
+  earthGroup.position.y += 0.15;
+  earthGroup.rotation.y = pg.rotation.y;
+
+  const geo = new THREE.SphereGeometry(0.28, 32, 32);
+  const mat = new THREE.MeshPhongMaterial({
+    color: 0x1a6faf,
+    emissive: 0x0a1a3a,
+    shininess: 60,
+    specular: 0x224488,
+  });
+
+  // Draw land texture on canvas
+  const ecvs=document.createElement('canvas');
+  ecvs.width=512; ecvs.height=256;
+  const ectx=ecvs.getContext('2d');
+  const eg=ectx.createLinearGradient(0,0,0,256);
+  eg.addColorStop(0,'#1a6faf'); eg.addColorStop(0.5,'#0d4a7a'); eg.addColorStop(1,'#1a6faf');
+  ectx.fillStyle=eg; ectx.fillRect(0,0,512,256);
+  // Continents (rough approximation)
+  const continents=[
+    {x:130,y:80,w:70,h:60},{x:200,y:70,w:50,h:80},
+    {x:310,y:90,w:60,h:70},{x:360,y:80,w:40,h:50},
+    {x:80,y:100,w:30,h:50},{x:220,y:150,w:80,h:60}
+  ];
+  ectx.fillStyle='rgba(34,120,60,0.9)';
+  continents.forEach(c=>{
+    ectx.beginPath();
+    ectx.ellipse(c.x,c.y,c.w/2,c.h/2,0,0,Math.PI*2);
+    ectx.fill();
+  });
+  mat.map = new THREE.CanvasTexture(ecvs);
+
+  earthMesh = new THREE.Mesh(geo, mat);
+  earthGroup.add(earthMesh);
+
+  // Atmosphere glow
+  const atmGeo=new THREE.SphereGeometry(0.31,32,32);
+  const atmMat=new THREE.MeshBasicMaterial({
+    color:0x4488ff, transparent:true, opacity:0.08, side:THREE.BackSide
+  });
+  earthGroup.add(new THREE.Mesh(atmGeo,atmMat));
+
+  scene.add(earthGroup);
+}
+
+function updateEarth() {
+  if(!earthMesh) return;
+  earthMesh.rotation.y += 0.003;
+  if(panelGroups[2]) {
+    earthGroup.position.copy(panelGroups[2].position);
+    earthGroup.position.z -= 0.15;
+    earthGroup.rotation.y = panelGroups[2].rotation.y;
+  }
+}
+
+function drawEarthApp() {
+  const def=APP_DEFS[2],cvs=panelGroups[2]?.userData?.canvas;
+  if(!cvs) return;
+  const ctx=cvs.getContext('2d');
+  drawAppBase(cvs,def,2);
+  ctx.textAlign='center';
+  ctx.font='16px -apple-system,Helvetica';
+  ctx.fillStyle='rgba(255,255,255,0.65)';
+  ctx.fillText('Интерактивная 3D модель планеты', 256, 110);
+  ctx.fillText('Используйте взгляд для вращения', 256, 132);
+
+  /* Data points */
+  const pts=[
+    ['🌡️','Темп. поверхн.','15°C avg'],
+    ['💧','Влажность','71%'],
+    ['🌊','Уровень океана','+3.3mm/yr'],
+    ['🌿','CO₂','421 ppm'],
+  ];
+  pts.forEach(([ic,lb,vl],i)=>{
+    const x=64+i*128, y=190;
+    ctx.font='26px serif'; ctx.fillText(ic,x,y);
+    ctx.font='bold 14px -apple-system,Helvetica';
+    ctx.fillStyle='rgba(255,255,255,0.5)';
+    ctx.fillText(lb,x,y+22);
+    ctx.font='bold 16px -apple-system,Helvetica';
+    ctx.fillStyle='rgba(80,220,120,0.95)';
+    ctx.fillText(vl,x,y+42);
+  });
+  if(panelGroups[2]?.userData?.tex) panelGroups[2].userData.tex.needsUpdate=true;
+}
+
+/* Notes app */
+let noteText='';
+let recognition=null;
+function drawNotesApp() {
+  const def=APP_DEFS[3],cvs=panelGroups[3]?.userData?.canvas;
+  if(!cvs) return;
+  const ctx=cvs.getContext('2d');
+  drawAppBase(cvs,def,3);
+
+  /* Note area */
+  ctx.fillStyle='rgba(255,240,180,0.08)';
+  rrect(ctx,20,65,472,200,12); ctx.fill();
+  ctx.strokeStyle='rgba(255,220,100,0.25)'; ctx.lineWidth=1;
+  rrect(ctx,20,65,472,200,12); ctx.stroke();
+
+  /* Lines */
+  for(let i=0;i<5;i++){
+    ctx.beginPath(); ctx.moveTo(20,95+i*34); ctx.lineTo(492,95+i*34);
+    ctx.strokeStyle='rgba(255,220,100,0.1)'; ctx.lineWidth=1; ctx.stroke();
+  }
+
+  ctx.font='16px -apple-system,Helvetica';
+  ctx.fillStyle='rgba(255,255,255,0.85)';
+  ctx.textAlign='left';
+  const lines=wrapText(ctx, noteText||'Нажмите 🎤 чтобы добавить заметку...', 30, 88, 452, 30);
+
+  /* Buttons */
+  ctx.textAlign='center';
+  [['🎤','Голос',170],['🗑️','Очист.',256],['📤','Поделит',342]].forEach(([ic,lb,x])=>{
+    ctx.fillStyle='rgba(255,255,255,0.1)';
+    rrect(ctx,x-36,278,72,30,15); ctx.fill();
+    ctx.font='18px serif'; ctx.fillStyle='rgba(255,255,255,0.8)';
+    ctx.fillText(ic,x,298);
+  });
+
+  if(panelGroups[3]?.userData?.tex) panelGroups[3].userData.tex.needsUpdate=true;
+}
+
+function wrapText(ctx,txt,x,y,maxW,lh){
+  const words=txt.split(' '), lines=[];
+  let cur='';
+  words.forEach(w=>{
+    const t=cur?cur+' '+w:w;
+    if(ctx.measureText(t).width>maxW&&cur){lines.push(cur);cur=w;}
+    else cur=t;
+  });
+  if(cur) lines.push(cur);
+  lines.slice(0,5).forEach((l,i)=>{
+    ctx.fillText(l,x,y+i*lh);
+  });
+  return lines;
+}
+
+/* Meditation particles */
+let medParticles=[], medGroup;
+let meditationActive=false;
+let meditationOsc=null, meditationGain=null;
+
+function createMeditationParticles() {
+  medGroup=new THREE.Group();
+  const count=200;
+  const geo=new THREE.BufferGeometry();
+  const pos=new Float32Array(count*3);
+  const col=new Float32Array(count*3);
+  for(let i=0;i<count;i++){
+    pos[i*3]=(Math.random()-0.5)*6;
+    pos[i*3+1]=(Math.random()-0.5)*3;
+    pos[i*3+2]=-Math.random()*8-1;
+    const t=Math.random();
+    col[i*3]=0.3+t*0.5;
+    col[i*3+1]=0.1+t*0.3;
+    col[i*3+2]=0.8+t*0.2;
+  }
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  const mat=new THREE.PointsMaterial({size:0.04,vertexColors:true,transparent:true,opacity:0});
+  medGroup.add(new THREE.Points(geo,mat));
+  scene.add(medGroup);
+  medGroup.userData={geo,mat,pos,count};
+}
+
+function updateMeditation(dt) {
+  if(!meditationActive||!medGroup) return;
+  const {pos,count,mat} = medGroup.userData;
+  if(mat.opacity<0.8) mat.opacity=Math.min(0.8,mat.opacity+dt*0.5);
+  for(let i=0;i<count;i++){
+    pos[i*3+2] += dt*1.5;
+    if(pos[i*3+2]>2) {
+      pos[i*3]=(Math.random()-0.5)*6;
+      pos[i*3+1]=(Math.random()-0.5)*3;
+      pos[i*3+2]=-8;
     }
+  }
+  medGroup.userData.geo.attributes.position.needsUpdate=true;
+}
 
-    // ЛИНИИ МЕЖДУ ПАЛЬЦАМИ
-    const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffaa88 });
-    for (let i = 0; i < fingers.length - 1; i++) {
-        const points = [];
-        points.push(fingers[i].position.clone());
-        points.push(fingers[i+1].position.clone());
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const line = new THREE.Line(geometry, lineMaterial);
-        handGroup.add(line);
+function drawMeditationApp() {
+  const def=APP_DEFS[4],cvs=panelGroups[4]?.userData?.canvas;
+  if(!cvs) return;
+  const ctx=cvs.getContext('2d');
+  drawAppBase(cvs,def,4);
+  ctx.textAlign='center';
+
+  /* Breathing circle */
+  const t=Date.now()/4000;
+  const r=40+Math.sin(t*Math.PI*2)*15;
+  const grd=ctx.createRadialGradient(256,170,0,256,170,r+20);
+  grd.addColorStop(0,'rgba(167,139,250,0.8)');
+  grd.addColorStop(1,'rgba(167,139,250,0)');
+  ctx.beginPath(); ctx.arc(256,170,r+20,0,Math.PI*2);
+  ctx.fillStyle=grd; ctx.fill();
+  ctx.beginPath(); ctx.arc(256,170,r,0,Math.PI*2);
+  ctx.strokeStyle='rgba(200,180,255,0.7)';ctx.lineWidth=2;ctx.stroke();
+
+  const phase=Math.sin(t*Math.PI*2);
+  ctx.font='18px -apple-system,Helvetica';
+  ctx.fillStyle='rgba(255,255,255,0.8)';
+  ctx.fillText(phase>0?'Вдох':'Выдох', 256, 170+r/2+30);
+
+  /* Controls */
+  const btnLabel=meditationActive?'⏹ Остановить':'▶ Начать';
+  ctx.fillStyle='rgba(167,139,250,0.3)';
+  rrect(ctx,180,262,152,38,19); ctx.fill();
+  ctx.strokeStyle='rgba(167,139,250,0.6)';ctx.lineWidth=1;
+  rrect(ctx,180,262,152,38,19); ctx.stroke();
+  ctx.font='bold 16px -apple-system,Helvetica';
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  ctx.fillText(btnLabel,256,286);
+
+  if(panelGroups[4]?.userData?.tex) panelGroups[4].userData.tex.needsUpdate=true;
+}
+
+/* System monitor */
+let fpsHistory=new Array(20).fill(60);
+let battLevel=null;
+function initBattery() {
+  if(navigator.getBattery) navigator.getBattery().then(b=>{ battLevel=b.level; b.onlevelchange=()=>battLevel=b.level; });
+}
+
+function drawMonitorApp() {
+  const def=APP_DEFS[5],cvs=panelGroups[5]?.userData?.canvas;
+  if(!cvs) return;
+  const ctx=cvs.getContext('2d');
+  drawAppBase(cvs,def,5);
+  ctx.textAlign='left';
+
+  /* FPS graph */
+  ctx.strokeStyle='rgba(0,220,180,0.8)';ctx.lineWidth=2;
+  ctx.beginPath();
+  fpsHistory.forEach((v,i)=>{
+    const x=20+i*(472/19);
+    const y=160-v/60*80;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  /* Grid lines */
+  [30,60,120].forEach(v=>{
+    const y=160-v/60*80;
+    ctx.beginPath();ctx.moveTo(20,y);ctx.lineTo(492,y);
+    ctx.strokeStyle=`rgba(255,255,255,0.08)`;ctx.lineWidth=1;ctx.stroke();
+    ctx.font='11px -apple-system,Helvetica';
+    ctx.fillStyle='rgba(255,255,255,0.3)';
+    ctx.fillText(v+'fps',20,y-3);
+  });
+
+  /* Stats */
+  const curFps=Math.round(fpsHistory[fpsHistory.length-1]);
+  const batt=battLevel!==null?Math.round(battLevel*100)+'%':'N/A';
+  const temp=Math.round(35+Math.random()*5)+'°C';
+  const pts=[
+    ['FPS',curFps+'',curFps>=55?'rgba(0,220,120,.9)':'rgba(255,160,40,.9)'],
+    ['Батарея',batt,'rgba(255,255,255,.7)'],
+    ['Темп.',temp,'rgba(255,130,80,.8)'],
+    ['Память','~'+Math.round(performance.memory?.usedJSHeapSize/1048576||128)+'MB','rgba(180,180,255,.8)'],
+  ];
+  ctx.textAlign='center';
+  pts.forEach(([l,v,c],i)=>{
+    const x=64+i*128;
+    ctx.font='12px -apple-system,Helvetica';
+    ctx.fillStyle='rgba(255,255,255,0.45)';
+    ctx.fillText(l,x,200);
+    ctx.font='bold 22px -apple-system,Helvetica';
+    ctx.fillStyle=c;
+    ctx.fillText(v,x,228);
+  });
+
+  ctx.font='12px -apple-system,Helvetica';
+  ctx.fillStyle='rgba(255,255,255,0.35)';
+  ctx.textAlign='center';
+  ctx.fillText('Three.js r128 · WebGL · Реальное время', 256, 298);
+
+  if(panelGroups[5]?.userData?.tex) panelGroups[5].userData.tex.needsUpdate=true;
+}
+
+function rrect(ctx,x,y,w,h,r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   GYROSCOPE
+   ══════════════════════════════════════════════════════════════ */
+function initGyro() {
+  const req = DeviceOrientationEvent?.requestPermission;
+  if(typeof req==='function') {
+    req().then(r=>{ if(r==='granted') listenGyro(); else toast('⚠️ Гироскоп недоступен'); })
+         .catch(()=>listenGyro());
+  } else {
+    listenGyro();
+  }
+}
+function listenGyro() {
+  window.addEventListener('deviceorientation', e=>{
+    if(e.alpha!==null) {
+      S.gyroEnabled=true;
+      S.targetAlpha=e.alpha||0;
+      S.targetBeta=e.beta||0;
+      S.gamma=e.gamma||0;
     }
+  }, true);
+}
+function updateCamera(dt) {
+  if(S.gyroEnabled){
+    const da=((S.targetAlpha-S.smoothAlpha+540)%360)-180;
+    S.smoothAlpha+=da*Math.min(1,dt*8);
+    S.smoothBeta+=(S.targetBeta-S.smoothBeta)*Math.min(1,dt*8);
+  }
+  if(!camera) return;
+  const isLand=window.innerWidth>window.innerHeight;
+  euler.set(
+    THREE.MathUtils.degToRad(isLand?(-S.smoothBeta+90)*0.3:(-S.gamma)*0.3),
+    THREE.MathUtils.degToRad(isLand?-S.smoothAlpha*0.3:-S.smoothAlpha*0.3),
+    0
+  );
+  camera.quaternion.slerp(new THREE.Quaternion().setFromEuler(euler), dt*5);
+}
 
-    window.addEventListener('touchstart', function(e) {
-        e.preventDefault();
-        activeTouches = [];
-        for (let i = 0; i < Math.min(e.touches.length, 5); i++) {
-            const touch = e.touches[i];
-            activeTouches.push({ id: touch.identifier, fingerIndex: i, x: touch.clientX, y: touch.clientY });
-            updateFingerPosition(i, touch.clientX, touch.clientY);
-        }
+/* ══════════════════════════════════════════════════════════════
+   GAZE / RAYCASTER
+   ══════════════════════════════════════════════════════════════ */
+let gazeProgress=0, gazeTarget=-1;
+function updateGaze(dt) {
+  if(!raycaster||!panels.length) return;
+  raycaster.setFromCamera(hitPoint, camera);
+  const hits=raycaster.intersectObjects(panels);
+  const newTarget=hits.length>0?hits[0].object.userData.panelIdx:-1;
+
+  if(newTarget!==gazeTarget) {
+    gazeTarget=newTarget; gazeProgress=0;
+    if(newTarget>=0) playHover();
+  }
+
+  if(newTarget>=0) {
+    gazeProgress=Math.min(1, gazeProgress+dt/1.2);
+    const prog=Math.round(gazeProgress*100);
+    $('ret-progress').style.background=
+      `conic-gradient(rgba(80,180,255,0.9) ${prog}%,transparent ${prog}%)`;
+    panelGroups.forEach((g,i)=>{
+      const focused=i===newTarget;
+      const eg=g.userData.edge;
+      if(focused){ eg.opacity=0.9; eg.needsUpdate=true; }
+      else{ eg.opacity=0.25; eg.needsUpdate=true; }
+      const ts=focused?1.05:1;
+      g.scale.lerp(new THREE.Vector3(ts,ts,ts),dt*4);
     });
-
-    window.addEventListener('touchmove', function(e) {
-        e.preventDefault();
-        for (let i = 0; i < e.touches.length && i < 5; i++) {
-            const touch = e.touches[i];
-            updateFingerPosition(i, touch.clientX, touch.clientY);
-        }
-    });
-
-    window.addEventListener('touchend', function(e) {
-        e.preventDefault();
-        // ПРЯЧЕМ РУКИ
-        for (let i = 0; i < fingers.length; i++) {
-            fingers[i].position.set(i * 0.1 - 0.2, -1, 0.5);
-        }
-        activeTouches = [];
-    });
-
-    function updateFingerPosition(index, x, y) {
-        const vector = new THREE.Vector2(
-            (x / window.innerWidth) * 2 - 1,
-            -(y / window.innerHeight) * 2 + 1
-        );
-        const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(vector, camera);
-        const pos3D = raycaster.ray.direction.clone().multiplyScalar(0.6);
-        fingers[index].position.copy(camera.position.clone().add(pos3D));
-        
-        // ОБНОВЛЯЕМ ЛИНИИ
-        for (let i = 0; i < fingers.length - 1; i++) {
-            const points = [fingers[i].position.clone(), fingers[i+1].position.clone()];
-            handGroup.children[fingers.length + i].geometry.dispose();
-            handGroup.children[fingers.length + i].geometry = new THREE.BufferGeometry().setFromPoints(points);
-        }
+    if(gazeProgress>=1 && gazeTarget>=0) {
+      openApp(gazeTarget);
+      gazeProgress=0;
     }
+  } else {
+    gazeProgress=Math.max(0,gazeProgress-dt*2);
+    $('ret-progress').style.background=
+      `conic-gradient(rgba(80,180,255,0.9) 0%,transparent 0%)`;
+    panelGroups.forEach(g=>{
+      g.scale.lerp(new THREE.Vector3(1,1,1),dt*4);
+      g.userData.edge.opacity=0.25;
+    });
+  }
+}
 
-    // ИНИЦИАЛИЗАЦИЯ
-    initThreeJS();
-    animate();
-    console.log('VisionOS initialized');
-  </script>
+/* ══════════════════════════════════════════════════════════════
+   APP OPEN / CLOSE
+   ══════════════════════════════════════════════════════════════ */
+let iframeEl=null;
+function openApp(idx) {
+  if(S.openApp===idx) return;
+  S.openApp=idx;
+  initAudio(); playClick(440,0.1);
+  toast(`Открыто: ${APP_DEFS[idx].emoji} ${APP_DEFS[idx].title}`);
+
+  // YouTube: show real iframe overlay
+  if(idx===1) showYoutubeOverlay();
+  else hideYoutubeOverlay();
+
+  // Notes: speech
+  if(idx===3) initSpeech();
+  // Meditation: audio
+  if(idx===4) toggleMeditation();
+  // Reset gaze
+  gazeProgress=0; gazeTarget=-1;
+}
+function closeApp() {
+  S.openApp=-1; hideYoutubeOverlay();
+}
+
+function showYoutubeOverlay() {
+  if(iframeEl) return;
+  iframeEl=document.createElement('div');
+  iframeEl.style.cssText=`position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:60%;max-width:400px;z-index:200;border-radius:16px;overflow:hidden;
+    background:#000;box-shadow:0 0 60px rgba(0,0,0,0.8);
+    border:1px solid rgba(255,255,255,0.2)`;
+  iframeEl.innerHTML=`<div style="padding:10px;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:space-between">
+    <span style="color:#fff;font-size:14px">🎬 Кинозал</span>
+    <span onclick="hideYoutubeOverlay()" style="color:rgba(255,255,255,.6);cursor:pointer;font-size:20px;padding:0 8px">✕</span>
+  </div>
+  <div style="aspect-ratio:16/9;background:#111;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px">
+    <div style="font-size:48px">▶️</div>
+    <div style="color:rgba(255,255,255,.7);font-size:13px">Wildlife 4K · YouTube</div>
+    <a href="https://www.youtube.com/watch?v=LfKMmEjz5O0" target="_blank" 
+       style="color:#3b9eff;font-size:13px;text-decoration:none">Открыть YouTube ↗</a>
+  </div>`;
+  document.body.appendChild(iframeEl);
+}
+function hideYoutubeOverlay() {
+  if(iframeEl){ iframeEl.remove(); iframeEl=null; }
+}
+
+function initSpeech() {
+  if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
+    toast('⚠️ Голос не поддерживается'); return;
+  }
+  if(recognition) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recognition=new SR();
+  recognition.lang='ru-RU'; recognition.continuous=true;
+  recognition.onresult=e=>{
+    const t=e.results[e.results.length-1][0].transcript;
+    noteText+=t+' ';
+    drawNotesApp();
+    toast('📝 '+t);
+  };
+  recognition.start();
+  toast('🎤 Говорите — записываю...');
+}
+
+function toggleMeditation() {
+  meditationActive=!meditationActive;
+  if(meditationActive) {
+    initAudio();
+    if(S.audioCtx) {
+      meditationOsc=S.audioCtx.createOscillator();
+      meditationGain=S.audioCtx.createGain();
+      meditationOsc.connect(meditationGain);
+      meditationGain.connect(S.audioCtx.destination);
+      meditationOsc.frequency.value=136.1; // OM frequency
+      meditationOsc.type='sine';
+      meditationGain.gain.setValueAtTime(0,S.audioCtx.currentTime);
+      meditationGain.gain.linearRampToValueAtTime(0.1,S.audioCtx.currentTime+2);
+      meditationOsc.start();
+    }
+    toast('🧘 Медитация начата — дышите глубже');
+  } else {
+    if(meditationOsc){
+      meditationGain.gain.linearRampToValueAtTime(0,S.audioCtx.currentTime+1);
+      meditationOsc.stop(S.audioCtx.currentTime+1.1);
+      meditationOsc=null;
+    }
+    if(medGroup?.userData?.mat) medGroup.userData.mat.opacity=0;
+    toast('🧘 Медитация завершена');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TOUCH HAND TRACKING
+   ══════════════════════════════════════════════════════════════ */
+const handsCvs=$('hands-canvas');
+const handsCtx=handsCvs.getContext('2d');
+
+function initTouchHands() {
+  handsCvs.width=window.innerWidth;
+  handsCvs.height=window.innerHeight;
+  document.addEventListener('touchstart', onTouchStart, {passive:false});
+  document.addEventListener('touchmove',  onTouchMove,  {passive:false});
+  document.addEventListener('touchend',   onTouchEnd,   {passive:false});
+}
+
+function onTouchStart(e) {
+  if(!S.handsMode) return;
+  e.preventDefault();
+  S.touches=Array.from(e.touches).map(t=>({x:t.clientX,y:t.clientY,id:t.identifier}));
+  checkPinch();
+}
+function onTouchMove(e) {
+  if(!S.handsMode) return;
+  e.preventDefault();
+  S.touches=Array.from(e.touches).map(t=>({x:t.clientX,y:t.clientY,id:t.identifier}));
+  checkPinch();
+  drawHandsOverlay();
+  // Update gaze from primary touch
+  if(S.touches.length>0) {
+    hitPoint.x=(S.touches[0].x/window.innerWidth)*2-1;
+    hitPoint.y=-(S.touches[0].y/window.innerHeight)*2+1;
+  }
+}
+function onTouchEnd(e) {
+  S.touches=Array.from(e.touches).map(t=>({x:t.clientX,y:t.clientY,id:t.identifier}));
+  if(S.touches.length===0) {
+    S.pinching=false;
+    handsCtx.clearRect(0,0,handsCvs.width,handsCvs.height);
+    hitPoint.set(0,0);
+  }
+}
+function checkPinch() {
+  if(S.touches.length>=2) {
+    const dx=S.touches[0].x-S.touches[1].x;
+    const dy=S.touches[0].y-S.touches[1].y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    const wasPinch=S.pinching;
+    S.pinching=dist<60;
+    if(S.pinching && !wasPinch) { playClick(700,0.06); }
+  }
+}
+
+function drawHandsOverlay() {
+  handsCtx.clearRect(0,0,handsCvs.width,handsCvs.height);
+  if(!S.handsMode||S.touches.length===0) return;
+  S.touches.forEach((t,i)=>{
+    const isPinch=S.pinching&&i<2;
+    const r=isPinch?22:16;
+    const grad=handsCtx.createRadialGradient(t.x,t.y,0,t.x,t.y,r*2);
+    grad.addColorStop(0,isPinch?'rgba(255,100,60,0.9)':'rgba(80,200,255,0.9)');
+    grad.addColorStop(1,'transparent');
+    handsCtx.beginPath();handsCtx.arc(t.x,t.y,r*2,0,Math.PI*2);
+    handsCtx.fillStyle=grad; handsCtx.fill();
+    handsCtx.beginPath();handsCtx.arc(t.x,t.y,r,0,Math.PI*2);
+    handsCtx.strokeStyle=isPinch?'rgba(255,120,80,0.9)':'rgba(100,210,255,0.9)';
+    handsCtx.lineWidth=2; handsCtx.stroke();
+    if(i===0) {
+      // Draw finger skeleton (simulated)
+      const joints=[[t.x-8,t.y+30],[t.x-4,t.y+20],[t.x,t.y+10],[t.x,t.y]];
+      handsCtx.beginPath();
+      handsCtx.moveTo(t.x,t.y+50);
+      joints.forEach(([jx,jy])=>handsCtx.lineTo(jx,jy));
+      handsCtx.strokeStyle='rgba(100,210,255,0.4)';
+      handsCtx.lineWidth=3; handsCtx.stroke();
+      joints.forEach(([jx,jy])=>{
+        handsCtx.beginPath();handsCtx.arc(jx,jy,4,0,Math.PI*2);
+        handsCtx.fillStyle='rgba(100,210,255,0.7)'; handsCtx.fill();
+      });
+    }
+    if(S.pinching&&S.touches.length>=2&&i===0) {
+      const t2=S.touches[1];
+      handsCtx.beginPath();
+      handsCtx.moveTo(t.x,t.y);handsCtx.lineTo(t2.x,t2.y);
+      handsCtx.strokeStyle='rgba(255,120,80,0.5)';
+      handsCtx.lineWidth=2; handsCtx.setLineDash([4,4]);
+      handsCtx.stroke(); handsCtx.setLineDash([]);
+    }
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   VR MODE
+   ══════════════════════════════════════════════════════════════ */
+function toggleVR() {
+  S.vrMode=!S.vrMode;
+  $('vr-tog').classList.toggle('on',S.vrMode);
+  $('vr-div').style.display=S.vrMode?'block':'none';
+  $('sep-wrap').style.display=S.vrMode?'flex':'none';
+  toast(S.vrMode?'🕶️ VR режим включён — вставьте в Cardboard':'📱 Обычный режим');
+}
+function toggleHands() {
+  S.handsMode=!S.handsMode;
+  $('hand-tog').classList.toggle('on',S.handsMode);
+  $('hands-canvas').style.display=S.handsMode?'block':'none';
+  toast(S.handsMode?'✋ Трекинг рук: коснитесь экрана':'✋ Трекинг рук выключен');
+}
+
+/* Slider: 0–100 maps to 0–0.1 m (100 mm max IPD offset each side) */
+$('sep-slider').addEventListener('input', e => {
+  S.separation = e.target.value / 1000;   // mm → m
+  toast(`👁 Разделение: ${e.target.value} мм`);
+});
+
+/* ══════════════════════════════════════════════════════════════
+   MAIN RENDER LOOP
+   ══════════════════════════════════════════════════════════════ */
+let lastCanvasUpdate=0;
+function animate() {
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.1);
+
+  // FPS tracking
+  S.frameCount++;
+  const now=performance.now();
+  if(now-S.lastFPS>500){
+    const fps=S.frameCount/((now-S.lastFPS)/1000);
+    fpsHistory.push(Math.min(120,fps));
+    fpsHistory.shift();
+    S.frameCount=0; S.lastFPS=now;
+  }
+
+  updateCamera(dt);
+  updateGaze(dt);
+  updateEarth();
+  updateMeditation(dt);
+
+  if(videoTex) videoTex.needsUpdate=true;
+
+  // Update canvases every 500ms
+  if(now-lastCanvasUpdate>500) {
+    lastCanvasUpdate=now;
+    updateClockApp();
+    drawYoutubeApp();
+    drawEarthApp();
+    drawNotesApp();
+    drawMeditationApp();
+    drawMonitorApp();
+  }
+
+  if (S.vrMode) {
+    renderVR();
+  } else {
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+    renderer.render(scene, camera);
+  }
+}
+
+function renderVR() {
+  stereoEffect.eyeSeparation = S.separation;
+  stereoEffect.render(scene, camera);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CAMERA
+   ══════════════════════════════════════════════════════════════ */
+let videoEl=null;
+
+async function startCamera(facing) {
+  if(S.stream) { S.stream.getTracks().forEach(t=>t.stop()); }
+  const constraints={ video:{ facingMode:{exact:facing}, width:{ideal:1920}, height:{ideal:1080} }, audio:false };
+  try {
+    S.stream=await navigator.mediaDevices.getUserMedia(constraints);
+  } catch(e) {
+    if(facing==='environment') {
+      toast('⚠️ Задняя камера недоступна, переключаюсь на фронтальную');
+      S.stream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+    } else throw e;
+  }
+  videoEl.srcObject=S.stream;
+  await new Promise(r=>videoEl.onloadedmetadata=r);
+  if(videoTex) { videoTex.image=videoEl; videoTex.needsUpdate=true; }
+}
+
+$('cam-flip-btn').addEventListener('click',async()=>{
+  S.camFacing=S.camFacing==='environment'?'user':'environment';
+  await startCamera(S.camFacing);
+  toast(S.camFacing==='environment'?'📷 Задняя камера':'🤳 Фронтальная камера');
+});
+
+$('reset-btn').addEventListener('click',()=>{
+  S.smoothAlpha=0; S.smoothBeta=0; S.targetAlpha=0; S.targetBeta=0;
+  if(camera) camera.quaternion.set(0,0,0,1);
+  toast('⊕ Вид сброшен');
+});
+
+/* ══════════════════════════════════════════════════════════════
+   BOOT
+   ══════════════════════════════════════════════════════════════ */
+function checkOrientation() {
+  const isLand=window.innerWidth>window.innerHeight;
+  $('land').classList.toggle('show',!isLand&&window.innerWidth<900);
+}
+window.addEventListener('resize',()=>{ checkOrientation(); onResize(); });
+window.addEventListener('orientationchange',()=>setTimeout(checkOrientation,300));
+
+// Try lock landscape
+try { screen.orientation?.lock?.('landscape'); } catch(e){}
+
+$('cam-btn').addEventListener('click',async()=>{
+  $('perm').classList.add('off');
+  $('load-msg').textContent='Запрашиваю камеру...';
+
+  // Create video element
+  videoEl=document.createElement('video');
+  videoEl.autoplay=true; videoEl.muted=true; videoEl.playsInline=true;
+
+  try {
+    await startCamera('environment');
+    $('load-msg').textContent='Инициализирую 3D сцену...';
+    await new Promise(r=>setTimeout(r,300));
+    initThree(videoEl);
+    initGyro();
+    initTouchHands();
+    initBattery();
+
+    await new Promise(r=>setTimeout(r,600));
+    $('loading').classList.add('off');
+    $('hud').classList.add('vis');
+    $('ret').style.display='block';
+    checkOrientation();
+    toast('👁 Добро пожаловать в Vision Pro AR!',3000);
+    animScale; // ensure called
+  } catch(err) {
+    $('perm').classList.remove('off');
+    const e=$('p-err');
+    e.style.display='block';
+    e.textContent='⚠️ '+(err.name==='NotAllowedError'
+      ?'Доступ к камере отклонён. Разрешите в настройках.'
+      :'Ошибка: '+err.message);
+    $('loading').classList.add('off');
+  }
+});
+
+/* ─── Scale animation helper ─── */
+function animScale(obj, from, to, dur, delay=0) {
+  setTimeout(()=>{
+    const s=performance.now();
+    function step(now){
+      const t=Math.min((now-s)/dur,1);
+      const e=1-Math.pow(1-t,3);
+      const v=from+(to-from)*e;
+      obj.scale.set(v,v,v);
+      if(t<1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  },delay);
+}
+
+// Init orientation check
+checkOrientation();
+</script>
 </body>
 </html>
