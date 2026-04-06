@@ -343,51 +343,147 @@ const APP_RADIUS = 3.2;
 const APP_ANGLES = [-70,-38,-10,10,38,70]; // degrees horizontal
 const W = 1.4, H = 0.9;
 
+/* ── Dock & close button refs ── */
+let dockGroup = null;
+const dockMeshes = [];   // raycasted menu icons
+const closeMeshes = [];  // per-panel X button
+
 function createApps() {
+  /* ── 6 app panels — all start HIDDEN (scale 0, invisible) ── */
   APP_DEFS.forEach((def, i) => {
     const group = new THREE.Group();
     const angle = THREE.MathUtils.degToRad(APP_ANGLES[i]);
     group.position.set(
       Math.sin(angle) * APP_RADIUS,
-      0.1,
+      0.15,
       -Math.cos(angle) * APP_RADIUS
     );
     group.rotation.y = -angle;
     group.userData = { appIdx: i, focused: false, open: false, canvas: null, tex: null };
 
-    /* Panel canvas */
     const { canvas: cvs, tex } = makeAppCanvas(def, i);
     group.userData.canvas = cvs;
     group.userData.tex = tex;
 
-    /* Main mesh */
     const geo = new THREE.PlaneGeometry(W, H);
-    const mat = new THREE.MeshBasicMaterial({ map:tex, transparent:true, side:THREE.DoubleSide });
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.userData.panelIdx = i;
     group.add(mesh);
 
     /* Glow border */
-    const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(W+0.01, H+0.01, 0.001));
+    const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(W + 0.01, H + 0.01, 0.001));
     const edgeMat = new THREE.LineBasicMaterial({
-      color: new THREE.Color(...def.color),
-      transparent: true, opacity: 0.5
+      color: new THREE.Color(...def.color), transparent: true, opacity: 0
     });
     group.add(new THREE.LineSegments(edgeGeo, edgeMat));
     group.userData.edge = edgeMat;
 
-    /* Scale in anim */
-    group.scale.set(0.01,0.01,0.01);
+    /* Close button — small ✕ tile at top-right of panel */
+    const closeCvs = makeCloseBtnCanvas();
+    const closeTex = new THREE.CanvasTexture(closeCvs);
+    const closeMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.18, 0.18),
+      new THREE.MeshBasicMaterial({ map: closeTex, transparent: true, side: THREE.DoubleSide })
+    );
+    closeMesh.position.set(W / 2 - 0.05, H / 2 + 0.05, 0.002);
+    closeMesh.userData.isCloseBtn = true;
+    closeMesh.userData.panelIdx = i;
+    group.add(closeMesh);
+    closeMeshes.push(closeMesh);
+
+    /* Hidden by default */
+    group.scale.set(0.001, 0.001, 0.001);
+    group.visible = false;
+
     scene.add(group);
     panelGroups.push(group);
     panels.push(mesh);
-
-    animScale(group, 0.01, 1, 700, i*130);
   });
 
-  // App-specific 3D extras
+  /* ── 3-D Dock menu — row of 6 icon tiles ── */
+  dockGroup = new THREE.Group();
+  dockGroup.position.set(0, -0.55, -2.4);   // below center, close to viewer
+
+  APP_DEFS.forEach((def, i) => {
+    const cvs = makeDockIcon(def, i);
+    const tex  = new THREE.CanvasTexture(cvs);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.42, 0.42),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
+    );
+    const total = APP_DEFS.length;
+    mesh.position.x = (i - (total - 1) / 2) * 0.52;
+    mesh.userData.dockIdx = i;
+    dockGroup.add(mesh);
+    dockMeshes.push(mesh);
+  });
+
+  /* Dock background pill */
+  const dockBgCvs = document.createElement('canvas');
+  dockBgCvs.width = 1024; dockBgCvs.height = 128;
+  const dbctx = dockBgCvs.getContext('2d');
+  const dbg = dbctx.createLinearGradient(0, 0, 0, 128);
+  dbg.addColorStop(0, 'rgba(30,30,50,0.75)'); dbg.addColorStop(1, 'rgba(10,10,25,0.85)');
+  rrect(dbctx, 0, 0, 1024, 128, 50); dbctx.fillStyle = dbg; dbctx.fill();
+  dbctx.strokeStyle = 'rgba(255,255,255,0.15)'; dbctx.lineWidth = 2;
+  rrect(dbctx, 1, 1, 1022, 126, 49); dbctx.stroke();
+  const dockBgMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.3, 0.52),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(dockBgCvs), transparent: true })
+  );
+  dockBgMesh.position.z = -0.003;
+  dockGroup.add(dockBgMesh);
+
+  scene.add(dockGroup);
+
+  /* App-specific 3D extras */
   createEarth();
   createMeditationParticles();
+}
+
+/* ── Close button canvas (small ✕) ── */
+function makeCloseBtnCanvas() {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = 'rgba(40,20,20,0.8)';
+  ctx.beginPath(); ctx.arc(32, 32, 28, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,80,80,0.9)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(32, 32, 28, 0, Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(20, 20); ctx.lineTo(44, 44); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(44, 20); ctx.lineTo(20, 44); ctx.stroke();
+  return c;
+}
+
+/* ── Dock icon canvas ── */
+function makeDockIcon(def, idx) {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const ctx = c.getContext('2d');
+  const [r, g, b] = def.color;
+
+  /* Rounded square bg */
+  const grad = ctx.createLinearGradient(0, 0, 128, 128);
+  grad.addColorStop(0, `rgba(${Math.round(r*80)},${Math.round(g*80)},${Math.round(b*160)},0.9)`);
+  grad.addColorStop(1, `rgba(${Math.round(r*40)},${Math.round(g*40)},${Math.round(b*80)},0.95)`);
+  rrect(ctx, 4, 4, 120, 120, 28); ctx.fillStyle = grad; ctx.fill();
+  ctx.strokeStyle = `rgba(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)},0.6)`;
+  ctx.lineWidth = 2;
+  rrect(ctx, 4, 4, 120, 120, 28); ctx.stroke();
+
+  /* Emoji */
+  ctx.font = '52px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(def.emoji, 64, 72);
+
+  /* Label */
+  ctx.font = 'bold 14px -apple-system,Helvetica';
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.fillText(def.title.length > 9 ? def.title.slice(0,9)+'…' : def.title, 64, 118);
+  return c;
 }
 
 /* ─── Canvas textures ─── */
@@ -818,98 +914,175 @@ function initGyro() {
     listenGyro();
   }
 }
+/* ── DeviceOrientationControls algorithm (from Three.js source) ──
+   Correct quaternion math for Cardboard in landscape mode.           */
+const _zee    = new THREE.Vector3(0, 0, 1);
+const _q1dock = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)); // -PI/2 around X
+const _devQ   = new THREE.Quaternion();
+const _scrQ   = new THREE.Quaternion();
+const _eul2   = new THREE.Euler();
+
 function listenGyro() {
-  window.addEventListener('deviceorientation', e=>{
-    if(e.alpha!==null) {
-      S.gyroEnabled=true;
-      S.targetAlpha=e.alpha||0;
-      S.targetBeta=e.beta||0;
-      S.gamma=e.gamma||0;
-    }
+  window.addEventListener('deviceorientation', e => {
+    if (e.alpha === null) return;
+    S.gyroEnabled = true;
+    S.targetAlpha = e.alpha || 0;   // azimuth   0-360
+    S.targetBeta  = e.beta  || 0;   // pitch   -180/180
+    S.gamma       = e.gamma || 0;   // roll     -90/90
   }, true);
 }
-function updateCamera(dt) {
-  if(S.gyroEnabled){
-    const da=((S.targetAlpha-S.smoothAlpha+540)%360)-180;
-    S.smoothAlpha+=da*Math.min(1,dt*8);
-    S.smoothBeta+=(S.targetBeta-S.smoothBeta)*Math.min(1,dt*8);
-  }
-  if(!camera) return;
-  const isLand=window.innerWidth>window.innerHeight;
-  euler.set(
-    THREE.MathUtils.degToRad(isLand?(-S.smoothBeta+90)*0.3:(-S.gamma)*0.3),
-    THREE.MathUtils.degToRad(isLand?-S.smoothAlpha*0.3:-S.smoothAlpha*0.3),
-    0
+
+function updateCamera() {
+  if (!camera) return;
+  if (!S.gyroEnabled) return;
+
+  // Build quaternion the same way Three.js DeviceOrientationControls does:
+  // euler order YXZ — alpha=Y, beta=X, -gamma=Z
+  _eul2.set(
+    THREE.MathUtils.degToRad(S.targetBeta),
+    THREE.MathUtils.degToRad(S.targetAlpha),
+    THREE.MathUtils.degToRad(-S.gamma),
+    'YXZ'
   );
-  camera.quaternion.slerp(new THREE.Quaternion().setFromEuler(euler), dt*5);
+  _devQ.setFromEuler(_eul2);
+
+  // Tilt correction: device lies flat by default, we want forward-looking
+  _devQ.multiply(_q1dock);
+
+  // Screen orientation offset — landscape-left = -90° around Z
+  _scrQ.setFromAxisAngle(_zee, -Math.PI / 2);
+  _devQ.multiply(_scrQ);
+
+  // Smooth slop
+  camera.quaternion.slerp(_devQ, 0.12);
 }
 
 /* ══════════════════════════════════════════════════════════════
    GAZE / RAYCASTER
    ══════════════════════════════════════════════════════════════ */
-let gazeProgress=0, gazeTarget=-1;
-function updateGaze(dt) {
-  if(!raycaster||!panels.length) return;
-  raycaster.setFromCamera(hitPoint, camera);
-  const hits=raycaster.intersectObjects(panels);
-  const newTarget=hits.length>0?hits[0].object.userData.panelIdx:-1;
+let gazeProgress = 0, gazeTarget = -1, gazeType = ''; // type: 'dock' | 'close' | 'panel'
 
-  if(newTarget!==gazeTarget) {
-    gazeTarget=newTarget; gazeProgress=0;
-    if(newTarget>=0) playHover();
+function updateGaze(dt) {
+  if (!raycaster) return;
+  raycaster.setFromCamera(hitPoint, camera);
+
+  /* Build list of raycasted objects depending on what's visible */
+  const targets = [];
+  // Dock icons always visible
+  dockMeshes.forEach(m => targets.push(m));
+  // Open panel's close button
+  if (S.openApp >= 0) targets.push(closeMeshes[S.openApp]);
+
+  const hits = raycaster.intersectObjects(targets);
+  let newTarget = -1, newType = '';
+
+  if (hits.length > 0) {
+    const obj = hits[0].object;
+    if (obj.userData.dockIdx !== undefined) {
+      newTarget = obj.userData.dockIdx;
+      newType   = 'dock';
+    } else if (obj.userData.isCloseBtn) {
+      newTarget = obj.userData.panelIdx;
+      newType   = 'close';
+    }
   }
 
-  if(newTarget>=0) {
-    gazeProgress=Math.min(1, gazeProgress+dt/1.2);
-    const prog=Math.round(gazeProgress*100);
-    $('ret-progress').style.background=
+  const key = newType + newTarget;
+  const oldKey = gazeType + gazeTarget;
+
+  if (key !== oldKey) {
+    gazeTarget = newTarget;
+    gazeType   = newType;
+    gazeProgress = 0;
+    if (newTarget >= 0) playHover();
+  }
+
+  /* Progress ring & gaze dwell */
+  if (newTarget >= 0) {
+    const dwellTime = newType === 'close' ? 0.8 : 1.0;
+    gazeProgress = Math.min(1, gazeProgress + dt / dwellTime);
+    const prog = Math.round(gazeProgress * 100);
+    $('ret-progress').style.background =
       `conic-gradient(rgba(80,180,255,0.9) ${prog}%,transparent ${prog}%)`;
-    panelGroups.forEach((g,i)=>{
-      const focused=i===newTarget;
-      const eg=g.userData.edge;
-      if(focused){ eg.opacity=0.9; eg.needsUpdate=true; }
-      else{ eg.opacity=0.25; eg.needsUpdate=true; }
-      const ts=focused?1.05:1;
-      g.scale.lerp(new THREE.Vector3(ts,ts,ts),dt*4);
-    });
-    if(gazeProgress>=1 && gazeTarget>=0) {
-      openApp(gazeTarget);
-      gazeProgress=0;
+
+    /* Highlight dock icon */
+    if (newType === 'dock') {
+      dockMeshes.forEach((m, i) => {
+        m.scale.setScalar(i === newTarget ? 1.18 : 1.0);
+      });
+    }
+
+    if (gazeProgress >= 1) {
+      gazeProgress = 0;
+      if (newType === 'dock')  openApp(newTarget);
+      if (newType === 'close') closeApp();
     }
   } else {
-    gazeProgress=Math.max(0,gazeProgress-dt*2);
-    $('ret-progress').style.background=
-      `conic-gradient(rgba(80,180,255,0.9) 0%,transparent 0%)`;
-    panelGroups.forEach(g=>{
-      g.scale.lerp(new THREE.Vector3(1,1,1),dt*4);
-      g.userData.edge.opacity=0.25;
-    });
+    gazeProgress = Math.max(0, gazeProgress - dt * 2);
+    $('ret-progress').style.background = `conic-gradient(rgba(80,180,255,0.9) 0%,transparent 0%)`;
+    dockMeshes.forEach(m => m.scale.setScalar(1.0));
   }
 }
 
 /* ══════════════════════════════════════════════════════════════
    APP OPEN / CLOSE
    ══════════════════════════════════════════════════════════════ */
-let iframeEl=null;
+let iframeEl = null;
+
 function openApp(idx) {
-  if(S.openApp===idx) return;
-  S.openApp=idx;
-  initAudio(); playClick(440,0.1);
-  toast(`Открыто: ${APP_DEFS[idx].emoji} ${APP_DEFS[idx].title}`);
+  if (S.openApp === idx) return;
+  // Close previous if open
+  if (S.openApp >= 0) _hidePanel(S.openApp);
+  S.openApp = idx;
 
-  // YouTube: show real iframe overlay
-  if(idx===1) showYoutubeOverlay();
-  else hideYoutubeOverlay();
+  initAudio(); playClick(440, 0.12);
+  toast(`${APP_DEFS[idx].emoji}  ${APP_DEFS[idx].title}`);
 
-  // Notes: speech
-  if(idx===3) initSpeech();
-  // Meditation: audio
-  if(idx===4) toggleMeditation();
-  // Reset gaze
-  gazeProgress=0; gazeTarget=-1;
+  /* Show & animate panel in */
+  const g = panelGroups[idx];
+  g.visible = true;
+  g.userData.edge.opacity = 0.6;
+  animScale(g, 0.001, 1, 550);
+
+  /* Dim dock slightly when an app is open */
+  if (dockGroup) dockGroup.position.y = -0.72;
+
+  if (idx === 1) showYoutubeOverlay();
+  else           hideYoutubeOverlay();
+  if (idx === 3) initSpeech();
+  if (idx === 4) { if (!meditationActive) toggleMeditation(); }
+
+  gazeProgress = 0; gazeTarget = -1; gazeType = '';
 }
+
 function closeApp() {
-  S.openApp=-1; hideYoutubeOverlay();
+  if (S.openApp < 0) return;
+  const idx = S.openApp;
+  _hidePanel(idx);
+  S.openApp = -1;
+  hideYoutubeOverlay();
+
+  /* Restore dock */
+  if (dockGroup) dockGroup.position.y = -0.55;
+
+  playClick(300, 0.08);
+  toast('✕  Закрыто');
+  gazeProgress = 0; gazeTarget = -1; gazeType = '';
+}
+
+function _hidePanel(idx) {
+  const g = panelGroups[idx];
+  /* Animate scale → 0, then hide */
+  const startScale = g.scale.x;
+  const s = performance.now();
+  function step(now) {
+    const t = Math.min((now - s) / 350, 1);
+    const v = startScale * (1 - t * t);
+    g.scale.set(v, v, v);
+    if (t < 1) requestAnimationFrame(step);
+    else { g.visible = false; g.scale.set(0.001, 0.001, 0.001); }
+  }
+  requestAnimationFrame(step);
 }
 
 function showYoutubeOverlay() {
@@ -1110,7 +1283,7 @@ function animate() {
     S.frameCount=0; S.lastFPS=now;
   }
 
-  updateCamera(dt);
+  updateCamera();
   updateGaze(dt);
   updateEarth();
   updateMeditation(dt);
@@ -1169,9 +1342,10 @@ $('cam-flip-btn').addEventListener('click',async()=>{
   toast(S.camFacing==='environment'?'📷 Задняя камера':'🤳 Фронтальная камера');
 });
 
-$('reset-btn').addEventListener('click',()=>{
-  S.smoothAlpha=0; S.smoothBeta=0; S.targetAlpha=0; S.targetBeta=0;
-  if(camera) camera.quaternion.set(0,0,0,1);
+$('reset-btn').addEventListener('click', () => {
+  S.smoothAlpha = S.targetAlpha;  // re-baseline to current heading
+  S.smoothBeta  = S.targetBeta;
+  if (camera) camera.quaternion.set(0, 0, 0, 1);
   toast('⊕ Вид сброшен');
 });
 
