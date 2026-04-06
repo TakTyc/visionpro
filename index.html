@@ -103,7 +103,7 @@
   <canvas id="scene-canvas"></canvas>
 
   <div id="controls">
-    <button id="enableCameraBtn" class="btn">📷 Включить камеру</button>
+    <button id="enableCameraBtn" class="btn" onclick="startCameraWithPermission()">📷 Включить камеру</button>
     <button id="switchCameraBtn" class="btn hidden">🔄 Переключить камеру</button>
     <button id="vrToggleBtn" class="btn hidden">🕶️ VR On/Off</button>
     <button id="resetBtn" class="btn hidden">⊕ Сброс</button>
@@ -209,7 +209,7 @@
       ctx.fillText(line.trim(), x, y);
     }
 
-    async function startCamera() {
+    async function startCamera(facingMode = 'environment') {
       console.log('Starting camera...');
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera not supported');
@@ -223,7 +223,7 @@
       const constraints = {
         audio: false,
         video: {
-          facingMode: { exact: 'environment' },
+          facingMode: { exact: facingMode },
           width: { ideal: 1920 },
           height: { ideal: 1080 }
         }
@@ -237,7 +237,7 @@
         if (video.readyState < 2) {
           await new Promise(resolve => { video.onloadedmetadata = resolve; });
         }
-        state.facingMode = 'environment';
+        state.facingMode = facingMode;
         console.log('Camera started successfully');
         showToast('Камера запущена');
         enableCameraBtn.classList.add('hidden');
@@ -251,7 +251,7 @@
         const fallbackConstraints = {
           audio: false,
           video: {
-            facingMode: 'environment',
+            facingMode: facingMode,
             width: { ideal: 1920 },
             height: { ideal: 1080 }
           }
@@ -264,7 +264,7 @@
           if (video.readyState < 2) {
             await new Promise(resolve => { video.onloadedmetadata = resolve; });
           }
-          state.facingMode = 'environment';
+          state.facingMode = facingMode;
           console.log('Camera started with fallback');
           showToast('Камера запущена (fallback)');
           enableCameraBtn.classList.add('hidden');
@@ -597,13 +597,22 @@
       }
     }
 
-
-
-
+    // iOS Safari support: request permission first
+    window.startCameraWithPermission = async function() {
+      try {
+        // Сначала запрашиваем ЛЮБУЮ камеру для получения разрешения
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        // Потом уже запускаем с нужной камерой
+        await startCamera(state.facingMode);
+        initThree();
+      } catch (error) {
+        showToast('Ошибка камеры: ' + error.message);
+      }
+    };
 
     enableCameraBtn.addEventListener('click', async () => {
       try {
-        await startCamera();
+        await startCamera(state.facingMode);
         initThree();
       } catch (error) {
         showToast('Ошибка камеры: ' + error.message);
