@@ -1,391 +1,869 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Vision Pro AR Fixed</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Vision Pro Cardboard VR</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100%;overflow:hidden;background:#000;
-  font-family:-apple-system,"SF Pro Display","Helvetica Neue",sans-serif;
-  -webkit-font-smoothing:antialiased}
+  :root {
+    color-scheme: dark;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
 
-#video-bg {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+  body { position: relative; }
+
+  #video-bg {
     position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
     z-index: 0;
-}
+    background: #000;
+  }
 
-canvas {
+  canvas {
     position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
     z-index: 1;
-    background: transparent;
-}
+    pointer-events: auto;
+  }
 
-/* HUD */
-#hud{position:fixed;bottom:0;left:0;right:0;z-index:60;
-  padding:12px 20px 18px;
-  background:linear-gradient(to top,rgba(0,0,0,0.7),transparent);
-  display:flex;flex-direction:column;align-items:center;gap:10px}
-#hud.vis{display:flex}
-.hud-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);
-  border-radius:22px;padding:8px 16px;
-  color:#fff;font-size:13px;font-weight:500;cursor:pointer;
-  white-space:nowrap;transition:all .2s}
-.hud-btn:active{background:rgba(255,255,255,0.2)}
-.hud-btn.active{background:rgba(59,158,255,0.3);border-color:rgba(59,158,255,0.6)}
-.toggle-sw{width:40px;height:24px;background:rgba(255,255,255,0.15);
-  border-radius:12px;position:relative;cursor:pointer;
-  border:1px solid rgba(255,255,255,0.2);transition:background .3s}
-.toggle-sw.on{background:rgba(59,158,255,0.8)}
-.toggle-sw::after{content:"";position:absolute;left:3px;top:3px;
-  width:16px;height:16px;background:#fff;border-radius:50%;
-  transition:transform .3s;box-shadow:0 2px 4px rgba(0,0,0,0.3)}
-.toggle-sw.on::after{transform:translateX(16px)}
-.sep-label{font-size:11px;color:rgba(255,255,255,0.5)}
-#sep-slider{-webkit-appearance:none;width:70px;height:3px;
-  border-radius:2px;background:rgba(255,255,255,0.2);outline:none}
-#sep-slider::-webkit-slider-thumb{-webkit-appearance:none;
-  width:16px;height:16px;border-radius:50%;
-  background:rgba(255,255,255,0.9);box-shadow:0 2px 6px rgba(0,0,0,0.4)}
+  #perm, #app-overlay, #hud, #toast {
+    position: fixed;
+    z-index: 10;
+    left: 50%;
+    transform: translateX(-50%);
+  }
 
-/* Toast */
-#toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);
-  z-index:700;background:rgba(0,0,0,0.7);backdrop-filter:blur(20px);
-  border:1px solid rgba(255,255,255,0.15);border-radius:30px;
-  padding:10px 22px;font-size:13px;color:rgba(255,255,255,0.85);
-  white-space:nowrap;opacity:0;transition:opacity .3s;pointer-events:none}
-#toast.show{opacity:1}
+  #perm {
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 28px;
+    background: radial-gradient(circle at top, rgba(24, 38, 72, 0.85), rgba(0,0,0,0.95));
+    backdrop-filter: blur(24px);
+  }
 
-/* Perm screen */
-#perm{position:fixed;inset:0;z-index:900;
-  background:radial-gradient(ellipse at 25% 35%,#0d1b3e 0%,#000 65%);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:22px;padding:40px}
-#perm.off{display:none}
-.p-logo{width:96px;height:96px;border-radius:30px;
-  background:linear-gradient(135deg,rgba(59,158,255,0.3),rgba(167,139,250,0.15));
-  border:1px solid rgba(255,255,255,0.25);
-  display:flex;align-items:center;justify-content:center;font-size:50px;
-  box-shadow:0 0 60px rgba(59,158,255,0.2),inset 0 1px 0 rgba(255,255,255,0.15)}
-.p-title{font-size:30px;font-weight:700;color:#fff;letter-spacing:-0.5px}
-.p-sub{font-size:14px;color:rgba(255,255,255,0.5);text-align:center;
-  line-height:1.7;max-width:290px}
-.p-btn{padding:15px 40px;
-  background:linear-gradient(135deg,rgba(59,158,255,0.4),rgba(167,139,250,0.25));
-  border:1px solid rgba(255,255,255,0.35);border-radius:50px;
-  color:#fff;font-size:17px;font-weight:600;cursor:pointer;
-  backdrop-filter:blur(10px);transition:all .2s}
-.p-btn:active{transform:scale(.95)}
-.p-err{font-size:13px;color:#ff6b6b;text-align:center;max-width:280px;display:none}
+  .p-logo {
+    width: 96px;
+    height: 96px;
+    border-radius: 28px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    display: grid;
+    place-items: center;
+    font-size: 48px;
+    color: #9fcaff;
+    box-shadow: 0 0 50px rgba(95, 180, 255, 0.16);
+  }
+
+  .p-title {
+    color: #fff;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    text-align: center;
+  }
+
+  .p-sub {
+    color: rgba(255,255,255,0.68);
+    text-align: center;
+    line-height: 1.6;
+    max-width: 320px;
+    font-size: 15px;
+  }
+
+  .p-btn,
+  .hud-btn,
+  .overlay-close,
+  .low-btn {
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.09);
+    color: #fff;
+    padding: 14px 22px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .18s ease, background .18s ease, border-color .18s ease;
+    backdrop-filter: blur(24px);
+  }
+
+  .p-btn:hover,
+  .hud-btn:hover,
+  .overlay-close:hover,
+  .low-btn:hover {
+    transform: scale(1.02);
+    background: rgba(255,255,255,0.14);
+  }
+
+  .p-err {
+    color: #ff7d7d;
+    font-size: 14px;
+    text-align: center;
+    max-width: 300px;
+    line-height: 1.4;
+  }
+
+  #hud {
+    bottom: 18px;
+    width: calc(100% - 24px);
+    max-width: 760px;
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: rgba(12, 18, 35, 0.64);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 28px;
+    backdrop-filter: blur(24px);
+    box-shadow: 0 20px 80px rgba(0,0,0,0.35);
+  }
+
+  #hud.visible { display: flex; }
+
+  .hud-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; }
+  .hud-row .info { color: rgba(255,255,255,0.75); font-size: 13px; }
+
+  .toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: rgba(255,255,255,0.76);
+    font-size: 14px;
+    user-select: none;
+  }
+
+  .switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.18);
+  }
+
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform .2s ease;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+
+  .switch.on { background: rgba(96, 171, 255, 0.75); }
+  .switch.on::after { transform: translateX(20px); }
+
+  #toast {
+    top: 18px;
+    width: auto;
+    padding: 12px 18px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.72);
+    color: #fff;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity .24s ease;
+    pointer-events: none;
+  }
+
+  #toast.show { opacity: 1; }
+
+  #app-overlay {
+    top: 12px;
+    width: calc(100% - 28px);
+    max-width: 760px;
+    padding: 18px;
+    background: rgba(6, 12, 24, 0.82);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 28px;
+    backdrop-filter: blur(26px);
+    box-shadow: 0 30px 100px rgba(0,0,0,0.35);
+    display: none;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  #app-overlay.visible { display: flex; }
+
+  .overlay-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .overlay-title { color: #fff; font-size: 18px; font-weight: 700; }
+
+  .overlay-body { color: rgba(255,255,255,0.78); font-size: 14px; line-height: 1.6; }
+
+  .overlay-content {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    min-height: 240px;
+    border-radius: 22px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.10);
+  }
+
+  .overlay-content iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
+  .low-btn { width: 100%; justify-content: center; }
 </style>
-</head>
-<body>
-
-<!-- Permission screen -->
-<div id="perm">
-  <div class="p-logo">👁</div>
-  <div class="p-title">Vision Pro AR</div>
-  <div class="p-sub">Пространственный интерфейс будущего.<br>Требуется доступ к камере телефона.</div>
-  <button class="p-btn" id="cam-btn">Разрешить камеру</button>
-  <div class="p-err" id="p-err"></div>
-</div>
-
-<!-- Video background -->
-<video id="video-bg" autoplay muted playsinline></video>
-
-<!-- Canvas -->
-<canvas id="c"></canvas>
-
-<!-- HUD -->
-<div id="hud">
-  <div style="display:flex;gap:10px">
-    <button class="hud-btn" id="cam-flip-btn">🔄 Камера</button>
-    <button class="hud-btn" id="reset-btn">⊕ Сброс</button>
-  </div>
-  <div style="display:flex;gap:10px">
-    <span style="font-size:12px;color:rgba(255,255,255,.6)">VR</span>
-    <div class="toggle-sw" id="vr-tog" onclick="toggleVR()"></div>
-  </div>
-  <div id="sep-wrap" style="display:none">
-    <span class="sep-label">Separation</span>
-    <input type="range" id="sep-slider" min="0" max="100" value="64">
-  </div>
-</div>
-
-<!-- Toast -->
-<div id="toast"></div>
-
-<script type="module">
-import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js";
-import { StereoEffect } from "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/effects/StereoEffect.js";
-
-/* ─── State ─── */
-const S = {
-  vrMode: false,
-  separation: 0.064,
-  camFacing: "environment",
-  stream: null,
-  gyroEnabled: false,
-  smoothAlpha: 0, smoothBeta: 0,
-  targetAlpha: 0, targetBeta: 0,
-  gamma: 0,
-  touches: [],
-  fingerSpheres: []
-};
-
-/* ─── Toast ─── */
-function toast(msg, dur=2500) {
-  const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show");
-  setTimeout(()=>t.classList.remove("show"), dur);
-}
-
-/* ─── Three.js core ─── */
-let scene, camera, renderer, effect;
-let clock = new THREE.Clock();
-let raycaster = new THREE.Raycaster();
-let euler = new THREE.Euler(0,0,0,"YXZ");
-const panels = [];
-
-function initThree() {
-  scene = new THREE.Scene();
-
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(0, 1.6, 0);
-  camera.lookAt(0, 1.6, -1);
-
-  renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("c"), antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-
-  effect = new StereoEffect(renderer);
-  effect.eyeSeparation = S.separation;
-  effect.setSize(window.innerWidth, window.innerHeight);
-
-  /* Ambient light */
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-  const dLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  dLight.position.set(5, 10, 5);
-  scene.add(dLight);
-
-  /* Virtual floor */
-  const floorGeo = new THREE.PlaneGeometry(20, 20, 20, 20);
-  const floorMat = new THREE.MeshBasicMaterial({
-    color: 0x1a2a4a, transparent: true, opacity: 0.15,
-    wireframe: true
-  });
-  const floor = new THREE.Mesh(floorGeo, floorMat);
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = 0;
-  scene.add(floor);
-
-  createPanels();
-  createHands();
-  animate();
-}
-
-function createPanels() {
-  const panelData = [
-    { x: -1, y: 1, z: -3, color: 0xff0000, title: "App 1" },
-    { x: 0, y: 1, z: -3.5, color: 0x00ff00, title: "App 2" },
-    { x: 1, y: 1, z: -3, color: 0x0000ff, title: "App 3" }
-  ];
-
-  panelData.forEach(data => {
-    const geo = new THREE.PlaneGeometry(1.4, 0.9);
-    const mat = new THREE.MeshBasicMaterial({ color: data.color, transparent: true, opacity: 0.8 });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(data.x, data.y, data.z);
-    scene.add(mesh);
-    panels.push(mesh);
-  });
-}
-
-function createHands() {
-  for (let i = 0; i < 5; i++) {
-    const geo = new THREE.SphereGeometry(0.02, 8, 8);
-    const mat = new THREE.MeshBasicMaterial({ color: 0x80c0ff, transparent: true, opacity: 0.8 });
-    const sphere = new THREE.Mesh(geo, mat);
-    sphere.position.set(0, 0, -1);
-    scene.add(sphere);
-    S.fingerSpheres.push(sphere);
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
+    "three/examples/jsm/effects/StereoEffect.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/effects/StereoEffect.js"
   }
-}
-
-function updateHands() {
-  if (S.touches.length === 0) return;
-  const touch = S.touches[0];
-  const mouse = new THREE.Vector2(
-    (touch.clientX / window.innerWidth) * 2 - 1,
-    -(touch.clientY / window.innerHeight) * 2 + 1
-  );
-  raycaster.setFromCamera(mouse, camera);
-  const pos3D = raycaster.ray.direction.clone().multiplyScalar(0.5).add(camera.position);
-
-  S.fingerSpheres.forEach((sphere, i) => {
-    sphere.position.set(
-      pos3D.x + i * 0.05,
-      pos3D.y,
-      pos3D.z
-    );
-  });
-}
-
-/* ─── Gyro ─── */
-function initGyro() {
-  const req = DeviceOrientationEvent?.requestPermission;
-  if (typeof req === "function") {
-    req().then(r => { if (r === "granted") listenGyro(); else toast("Гироскоп недоступен"); })
-         .catch(() => listenGyro());
-  } else {
-    listenGyro();
-  }
-}
-function listenGyro() {
-  window.addEventListener("deviceorientation", e => {
-    if (e.alpha !== null) {
-      S.gyroEnabled = true;
-      S.targetAlpha = e.alpha || 0;
-      S.targetBeta = e.beta || 0;
-      S.gamma = e.gamma || 0;
-    }
-  }, true);
-}
-function updateCamera(dt) {
-  if (S.gyroEnabled) {
-    const da = ((S.targetAlpha - S.smoothAlpha + 540) % 360) - 180;
-    S.smoothAlpha += da * Math.min(1, dt * 8);
-    S.smoothBeta += (S.targetBeta - S.smoothBeta) * Math.min(1, dt * 8);
-  }
-  const isLand = window.innerWidth > window.innerHeight;
-  euler.set(
-    THREE.MathUtils.degToRad(isLand ? (-S.smoothBeta + 90) * 0.3 : (-S.gamma) * 0.3),
-    THREE.MathUtils.degToRad(isLand ? -S.smoothAlpha * 0.3 : -S.smoothAlpha * 0.3),
-    0
-  );
-  camera.quaternion.slerp(new THREE.Quaternion().setFromEuler(euler), dt * 5);
-}
-
-function updateSeparation(value) {
-  S.separation = value / 1000;
-  if (effect) {
-    effect.eyeSeparation = S.separation;
-    effect.setSize(window.innerWidth, window.innerHeight);
-  }
-}
-
-function handleResize() {
-  if (!camera || !renderer) return;
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  if (effect) {
-    effect.setSize(window.innerWidth, window.innerHeight);
-  }
-}
-
-window.addEventListener("resize", handleResize);
-
-/* ─── Touch ─── */
-document.addEventListener("touchstart", e => {
-  S.touches = Array.from(e.touches);
-}, { passive: false });
-document.addEventListener("touchmove", e => {
-  S.touches = Array.from(e.touches);
-  updateHands();
-}, { passive: false });
-document.addEventListener("touchend", e => {
-  S.touches = Array.from(e.touches);
-});
-
-/* ─── VR ─── */
-function toggleVR() {
-  S.vrMode = !S.vrMode;
-  document.getElementById("vr-tog").classList.toggle("on", S.vrMode);
-  document.getElementById("sep-wrap").style.display = S.vrMode ? "flex" : "none";
-  toast(S.vrMode ? "🕶️ VR режим включён" : "📱 Обычный режим");
-}
-
-/* ─── Animate ─── */
-function animate() {
-  requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.1);
-
-  updateCamera(dt);
-  updateHands();
-
-  if (S.vrMode) {
-    effect.render(scene, camera);
-  } else {
-    renderer.render(scene, camera);
-  }
-}
-
-/* ─── Camera ─── */
-async function startCamera(facing) {
-  if (S.stream) { S.stream.getTracks().forEach(t => t.stop()); }
-  const constraints = { video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false };
-  try {
-    S.stream = await navigator.mediaDevices.getUserMedia(constraints);
-  } catch (e) {
-    if (facing === "environment") {
-      toast("Задняя камера недоступна, переключаюсь на фронтальную");
-      S.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    } else throw e;
-  }
-  const video = document.getElementById("video-bg");
-  video.srcObject = S.stream;
-  video.muted = true;
-  video.playsInline = true;
-  await video.play().catch(() => {});
-  if (video.readyState < 2) {
-    await new Promise(r => { video.onloadedmetadata = r; });
-  }
-}
-
-document.getElementById("cam-flip-btn").addEventListener("click", async () => {
-  S.camFacing = S.camFacing === "environment" ? "user" : "environment";
-  await startCamera(S.camFacing);
-  toast(S.camFacing === "environment" ? "📷 Задняя камера" : "🤳 Фронтальная камера");
-});
-
-document.getElementById("reset-btn").addEventListener("click", () => {
-  S.smoothAlpha = 0; S.smoothBeta = 0; S.targetAlpha = 0; S.targetBeta = 0;
-  camera.quaternion.set(0, 0, 0, 1);
-  toast("⊕ Вид сброшен");
-});
-
-/* ─── Boot ─── */
-document.getElementById("cam-btn").addEventListener("click", async () => {
-  try {
-    await startCamera("environment");
-    initThree();
-    initGyro();
-    document.getElementById("perm").classList.add("off");
-    document.getElementById("hud").classList.add("vis");
-    toast("👁 Добро пожаловать в Vision Pro AR!", 3000);
-  } catch (err) {
-    const e = document.getElementById("p-err");
-    e.style.display = "block";
-    e.textContent = "⚠️ " + (err.name === "NotAllowedError"
-      ? "Доступ к камере отклонён. Разрешите в настройках."
-      : "Ошибка: " + err.message);
-  }
-});
-
-const sepSlider = document.getElementById("sep-slider");
-if (sepSlider) {
-  sepSlider.addEventListener("input", event => updateSeparation(event.target.value));
-  updateSeparation(sepSlider.value);
 }
 </script>
+</head>
+<body>
+  <div id="perm">
+    <div class="p-logo">👓</div>
+    <div class="p-title">Vision Pro Cardboard</div>
+    <div class="p-sub">Нажмите кнопку, чтобы включить заднюю камеру и войти в VR-режим без искажений.</div>
+    <button class="p-btn" id="cam-btn">Разрешить камеру</button>
+    <div class="p-err" id="perm-error"></div>
+  </div>
+
+  <video id="video-bg" autoplay muted playsinline></video>
+  <canvas id="scene-canvas"></canvas>
+
+  <div id="hud">
+    <div class="hud-row">
+      <button class="hud-btn" id="cam-flip-btn">🔄 Переключить камеру</button>
+      <button class="hud-btn" id="reset-btn">⊕ Сброс</button>
+      <button class="hud-btn" id="lock-btn">⤢ Ландшафт</button>
+    </div>
+    <div class="hud-row">
+      <div class="toggle-wrapper">
+        <div id="vr-switch" class="switch on"></div>
+        <span>Cardboard VR Mode</span>
+      </div>
+      <div class="info" id="status-info">Камера: задняя • VR: включён</div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="app-overlay">
+    <div class="overlay-header">
+      <div>
+        <div class="overlay-title" id="overlay-title">Приложение</div>
+        <div class="overlay-body" id="overlay-subtitle">Описание приложения.</div>
+      </div>
+      <button class="overlay-close" id="overlay-close">Закрыть</button>
+    </div>
+    <div class="overlay-content" id="overlay-content"></div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js';
+
+    const state = {
+      stream: null,
+      facingMode: 'environment',
+      stereoEnabled: true,
+      stereoSupported: true,
+      appSelected: null,
+      pinchActive: false,
+      pinchTriggered: false,
+      touches: [],
+      fps: 0,
+      battery: null,
+      sculptorPoints: []
+    };
+
+    const video = document.getElementById('video-bg');
+    const canvas = document.getElementById('scene-canvas');
+    const permOverlay = document.getElementById('perm');
+    const permError = document.getElementById('perm-error');
+    const hud = document.getElementById('hud');
+    const statusInfo = document.getElementById('status-info');
+    const toastEl = document.getElementById('toast');
+    const vrSwitch = document.getElementById('vr-switch');
+    const appOverlay = document.getElementById('app-overlay');
+    const overlayTitle = document.getElementById('overlay-title');
+    const overlaySubtitle = document.getElementById('overlay-subtitle');
+    const overlayContent = document.getElementById('overlay-content');
+
+    const camBtn = document.getElementById('cam-btn');
+    const flipBtn = document.getElementById('cam-flip-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const lockBtn = document.getElementById('lock-btn');
+    const overlayClose = document.getElementById('overlay-close');
+
+    let renderer, scene, camera, effect, clock, raycaster, animationId;
+    const appPanels = [];
+    const handSpheres = [];
+    let handLine;
+    let selectedPanel = null;
+    let lastFrameTime = performance.now();
+    let fpsSmoothing = 0;
+
+    const appDefinitions = [
+      { id: 'cinema', title: 'Кинозал', subtitle: 'Откройте видео с YouTube', x: -2.2, z: -3.0 },
+      { id: 'sculptor', title: '3D-скульптор', subtitle: 'Рисуйте линии касанием', x: 0.0, z: -3.6 },
+      { id: 'space', title: 'Космос', subtitle: 'Вращающаяся Земля', x: 2.2, z: -4.0 },
+      { id: 'browser', title: 'Браузер окон', subtitle: 'Нотатки и быстрый доступ', x: -1.1, z: -4.5 },
+      { id: 'meditation', title: 'Медитация', subtitle: 'Частицы и спокойствие', x: 1.1, z: -5.0 },
+      { id: 'monitor', title: 'Монитор системы', subtitle: 'FPS и заряд батареи', x: 0.0, z: -4.8 }
+    ];
+
+    const panelSize = { width: 1.44, height: 0.84 };
+    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x7cc8ff, linewidth: 2, transparent: true, opacity: 0.85 });
+
+    function showToast(message, duration = 2400) {
+      toastEl.textContent = message;
+      toastEl.classList.add('show');
+      clearTimeout(state.toastTimeout);
+      state.toastTimeout = setTimeout(() => toastEl.classList.remove('show'), duration);
+    }
+
+    function createPanelTexture(app) {
+      const canvasTexture = document.createElement('canvas');
+      canvasTexture.width = 512;
+      canvasTexture.height = 320;
+      const ctx = canvasTexture.getContext('2d');
+      ctx.fillStyle = '#0f1a35';
+      ctx.fillRect(0, 0, canvasTexture.width, canvasTexture.height);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.font = 'bold 42px sans-serif';
+      ctx.fillText(app.title, 24, 72);
+      ctx.font = '18px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.72)';
+      wrapText(ctx, app.subtitle, 24, 110, 460, 24);
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.fillRect(18, 132, 476, 154);
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      for (let i = 0; i < 4; i += 1) {
+        ctx.fillRect(30, 144 + i * 34, 420, 18);
+      }
+      ctx.fillStyle = '#86b7ff';
+      ctx.beginPath();
+      ctx.arc(478, 52, 30, 0, Math.PI * 2);
+      ctx.fill();
+      return new THREE.CanvasTexture(canvasTexture);
+    }
+
+    function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+      const words = text.split(' ');
+      let line = '';
+      for (const word of words) {
+        const testLine = `${line}${word} `;
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && line.length > 0) {
+          ctx.fillText(line, x, y);
+          line = `${word} `;
+          y += lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line.trim(), x, y);
+    }
+
+    async function setupCameraStream(facingMode) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Камера не поддерживается браузером');
+      }
+
+      if (state.stream) {
+        state.stream.getTracks().forEach(track => track.stop());
+        state.stream = null;
+      }
+
+      const constraints = {
+        audio: false,
+        video: {
+          facingMode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      state.stream = stream;
+      video.srcObject = stream;
+      await video.play();
+      if (video.readyState < 2) {
+        await new Promise(resolve => { video.onloadedmetadata = resolve; });
+      }
+      state.facingMode = facingMode;
+      updateStatus();
+      return stream;
+    }
+
+    function updateStatus() {
+      const cameraLabel = state.facingMode === 'environment' ? 'задняя' : 'фронтальная';
+      const vrLabel = state.stereoEnabled && state.stereoSupported ? 'включён' : 'выключен';
+      statusInfo.textContent = `Камера: ${cameraLabel} • VR: ${vrLabel}`;
+      vrSwitch.classList.toggle('on', state.stereoEnabled && state.stereoSupported);
+    }
+
+    function initThree() {
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000, 0);
+
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x000000, 0.02);
+
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 1.6, 0);
+      camera.lookAt(0, 1.5, -3);
+
+      clock = new THREE.Clock();
+      raycaster = new THREE.Raycaster();
+
+      const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+      scene.add(ambient);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+      dirLight.position.set(5, 10, 5);
+      scene.add(dirLight);
+
+      const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(24, 24),
+        new THREE.MeshStandardMaterial({ color: 0x0f1b35, roughness: 0.85, metalness: 0.1, transparent: true, opacity: 0.14 })
+      );
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = -0.05;
+      scene.add(floor);
+
+      createAppPanels();
+      createHandVisuals();
+      createSpaceEarth();
+
+      try {
+        effect = new StereoEffect(renderer);
+        effect.eyeSeparation = 0.064;
+        effect.setSize(window.innerWidth, window.innerHeight);
+      } catch (error) {
+        state.stereoSupported = false;
+        effect = null;
+        showToast('StereoEffect не поддерживается. Включен обычный режим.');
+      }
+
+      window.addEventListener('resize', onWindowResize);
+      document.addEventListener('visibilitychange', onVisibilityChange);
+      animate();
+    }
+
+    function createAppPanels() {
+      appDefinitions.forEach((app, index) => {
+        const texture = createPanelTexture(app);
+        const material = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          map: texture,
+          roughness: 0.2,
+          metalness: 0.8,
+          transparent: true,
+          opacity: 0.76,
+          emissive: 0x1f2c54,
+          emissiveIntensity: 0.28
+        });
+
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(panelSize.width, panelSize.height), material);
+        mesh.position.set(app.x, 1.42, app.z);
+        mesh.userData = {
+          id: app.id,
+          title: app.title,
+          subtitle: app.subtitle,
+          basePosition: mesh.position.clone(),
+          targetZ: app.z,
+          textureCanvas: texture.image,
+          texture: texture,
+          appIndex: index
+        };
+        mesh.name = app.id;
+        scene.add(mesh);
+        appPanels.push(mesh);
+      });
+    }
+
+    function createSpaceEarth() {
+      const earthGeo = new THREE.SphereGeometry(0.28, 32, 32);
+      const earthMat = new THREE.MeshStandardMaterial({ color: 0x577cff, roughness: 0.4, metalness: 0.5, emissive: 0x08294e, emissiveIntensity: 0.3 });
+      const earth = new THREE.Mesh(earthGeo, earthMat);
+      earth.position.set(2.2, 1.75, -3.4);
+      scene.add(earth);
+      state.earth = earth;
+    }
+
+    function createHandVisuals() {
+      const sphereMaterial = new THREE.MeshStandardMaterial({ color: 0x8ad7ff, transparent: true, opacity: 0.88, emissive: 0x288cff, emissiveIntensity: 0.4 });
+      for (let i = 0; i < 5; i += 1) {
+        const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 12), sphereMaterial);
+        sphere.visible = false;
+        scene.add(sphere);
+        handSpheres.push(sphere);
+      }
+      const lineGeo = new THREE.BufferGeometry();
+      const maxPoints = 128;
+      const positions = new Float32Array(maxPoints * 3);
+      lineGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      handLine = new THREE.Line(lineGeo, lineMaterial);
+      handLine.visible = false;
+      scene.add(handLine);
+    }
+
+    function onWindowResize() {
+      if (!camera || !renderer) return;
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      if (effect) effect.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function onVisibilityChange() {
+      if (document.hidden) {
+        cancelAnimationFrame(animationId);
+      } else {
+        lastFrameTime = performance.now();
+        animate();
+      }
+    }
+
+    function animate() {
+      animationId = requestAnimationFrame(animate);
+      const delta = Math.min(clock.getDelta(), 0.1);
+      updateFPS();
+      updateAppPanels(delta);
+      renderScene();
+    }
+
+    function updateFPS() {
+      const now = performance.now();
+      state.fps = 1000 / (now - lastFrameTime);
+      lastFrameTime = now;
+      fpsSmoothing = fpsSmoothing * 0.92 + state.fps * 0.08;
+      updateMonitorTexture();
+    }
+
+    function updateAppPanels(delta) {
+      appPanels.forEach(panel => {
+        const targetZ = panel.userData.targetZ;
+        panel.position.z += (targetZ - panel.position.z) * Math.min(delta * 6, 1);
+        panel.scale.lerp(new THREE.Vector3(panel.userData.id === state.appSelected ? 1.12 : 1.0, panel.userData.id === state.appSelected ? 1.12 : 1.0, 1), Math.min(delta * 8, 1));
+      });
+      if (state.earth) {
+        state.earth.rotation.y += 0.3 * delta;
+        state.earth.rotation.x = Math.sin(performance.now() * 0.0002) * 0.05;
+      }
+      updateMonitorTexture();
+      if (state.appSelected === 'sculptor') {
+        updateSculptorLine();
+      }
+    }
+
+    function updateMonitorTexture() {
+      const monitor = appPanels.find(panel => panel.userData.id === 'monitor');
+      if (!monitor) return;
+      const canvasTexture = monitor.userData.textureCanvas;
+      const ctx = canvasTexture.getContext('2d');
+      ctx.clearRect(0, 0, canvasTexture.width, canvasTexture.height);
+      ctx.fillStyle = '#0f1a35';
+      ctx.fillRect(0, 0, canvasTexture.width, canvasTexture.height);
+      ctx.fillStyle = 'rgba(255,255,255,0.88)';
+      ctx.font = 'bold 42px sans-serif';
+      ctx.fillText('Монитор системы', 24, 72);
+      ctx.fillStyle = 'rgba(255,255,255,0.68)';
+      ctx.font = '18px sans-serif';
+      ctx.fillText(`FPS: ${Math.round(fpsSmoothing)}`, 26, 126);
+      const batteryLevel = state.battery ? Math.round(state.battery.level * 100) : 'N/A';
+      ctx.fillText(`Батарея: ${batteryLevel}%`, 26, 158);
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.fillRect(24, 178, 460, 110);
+      ctx.fillStyle = '#84c7ff';
+      ctx.fillRect(34, 188, 420 * Math.min(1, (state.battery?.level ?? 0.5)), 36);
+      monitor.userData.texture.needsUpdate = true;
+    }
+
+    function updateSculptorLine() {
+      if (!state.sculptorPoints.length) {
+        handLine.visible = false;
+        return;
+      }
+      if (state.sculptorPoints.length > 128) {
+        state.sculptorPoints.splice(0, state.sculptorPoints.length - 128);
+      }
+      const positions = handLine.geometry.attributes.position.array;
+      state.sculptorPoints.forEach((point, index) => {
+        positions[index * 3] = point.x;
+        positions[index * 3 + 1] = point.y;
+        positions[index * 3 + 2] = point.z;
+      });
+      handLine.geometry.setDrawRange(0, state.sculptorPoints.length);
+      handLine.geometry.attributes.position.needsUpdate = true;
+      handLine.visible = state.sculptorPoints.length > 1;
+    }
+
+    function renderScene() {
+      if (state.stereoEnabled && effect && state.stereoSupported) {
+        effect.render(scene, camera);
+      } else {
+        renderer.render(scene, camera);
+      }
+    }
+
+    function handlePointer(rayX, rayY) {
+      raycaster.setFromCamera(new THREE.Vector2(rayX, rayY), camera);
+      const hits = raycaster.intersectObjects(appPanels, false);
+      if (hits.length > 0) {
+        const mesh = hits[0].object;
+        selectPanel(mesh.userData.id);
+      }
+    }
+
+    function selectPanel(panelId) {
+      const panel = appPanels.find(item => item.userData.id === panelId);
+      if (!panel) return;
+      if (state.appSelected === panelId) {
+        openAppOverlay(panelId);
+        return;
+      }
+      state.appSelected = panelId;
+      appPanels.forEach(item => {
+        item.userData.targetZ = item.userData.id === panelId ? -1.5 : item.userData.basePosition.z;
+      });
+      showToast(`Выбран ${panel.userData.title}`);
+    }
+
+    function openAppOverlay(appId) {
+      const app = appDefinitions.find(item => item.id === appId);
+      if (!app) return;
+      overlayTitle.textContent = app.title;
+      overlaySubtitle.textContent = app.subtitle;
+      overlayContent.innerHTML = '';
+      appOverlay.classList.add('visible');
+
+      if (appId === 'cinema') {
+        const frame = document.createElement('iframe');
+        frame.src = 'https://www.youtube.com/embed/ScMzIvxBSi4?autoplay=1&rel=0&mute=1';
+        overlayContent.appendChild(frame);
+      } else if (appId === 'browser') {
+        const content = document.createElement('div');
+        content.style.padding = '18px';
+        content.style.color = '#eef7ff';
+        content.style.fontSize = '14px';
+        content.innerHTML = '<p>• Быстрые заметки из AR-сессии</p><p>• Напоминания</p><p>• Ссылки и идеи</p>';
+        overlayContent.appendChild(content);
+      } else if (appId === 'meditation') {
+        const content = document.createElement('div');
+        content.style.padding = '18px';
+        content.style.color = '#cfe8ff';
+        content.style.fontSize = '14px';
+        content.innerHTML = '<p>Глубокое дыхание.</p><p>Сосредоточьтесь на движении частиц.</p><p>Отдых для глаз и ума.</p>';
+        overlayContent.appendChild(content);
+      } else if (appId === 'monitor') {
+        const content = document.createElement('div');
+        content.style.padding = '18px';
+        content.style.color = '#eef7ff';
+        content.style.fontSize = '14px';
+        content.innerHTML = '<p>FPS отображается в реальном времени.</p><p>Заряд батареи обновляется автоматически.</p>';
+        overlayContent.appendChild(content);
+      } else if (appId === 'sculptor') {
+        const content = document.createElement('div');
+        content.style.padding = '18px';
+        content.style.color = '#eef7ff';
+        content.style.fontSize = '14px';
+        content.innerHTML = '<p>Проведите одним пальцем по экрану, чтобы рисовать в пространстве.</p><p>Двойное касание запускает щипок-клик.</p>';
+        overlayContent.appendChild(content);
+      } else if (appId === 'space') {
+        const content = document.createElement('div');
+        content.style.padding = '18px';
+        content.style.color = '#eef7ff';
+        content.style.fontSize = '14px';
+        content.innerHTML = '<p>Вращающаяся Земля в космическом пространстве.</p><p>Смотрите на панель и нажмите повторно.</p>';
+        overlayContent.appendChild(content);
+      }
+    }
+
+    function closeAppOverlay() {
+      appOverlay.classList.remove('visible');
+      overlayContent.innerHTML = '';
+    }
+
+    function updateHandVisuals() {
+      if (!state.touches.length) {
+        handSpheres.forEach(sphere => sphere.visible = false);
+        handLine.visible = false;
+        return;
+      }
+      const ray = new THREE.Ray();
+      const point = new THREE.Vector3();
+      const steps = handSpheres.length;
+      const touch = state.touches[0];
+      const x = (touch.clientX / window.innerWidth) * 2 - 1;
+      const y = -(touch.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+      ray.copy(raycaster.ray);
+
+      const base = ray.at(0.5, point);
+      for (let i = 0; i < steps; i += 1) {
+        const sphere = handSpheres[i];
+        sphere.visible = true;
+        sphere.position.set(base.x + (i - 2) * 0.04, base.y - Math.abs(i - 2) * 0.02, base.z);
+      }
+
+      const positions = handLine.geometry.attributes.position.array;
+      handSpheres.forEach((sphere, index) => {
+        positions[index * 3] = sphere.position.x;
+        positions[index * 3 + 1] = sphere.position.y;
+        positions[index * 3 + 2] = sphere.position.z;
+      });
+      handLine.geometry.attributes.position.needsUpdate = true;
+      handLine.visible = true;
+    }
+
+    function handlePinchSelection() {
+      if (state.touches.length !== 2) {
+        state.pinchActive = false;
+        state.pinchTriggered = false;
+        return;
+      }
+      const [a, b] = state.touches;
+      const dx = a.clientX - b.clientX;
+      const dy = a.clientY - b.clientY;
+      const distance = Math.hypot(dx, dy);
+      const threshold = 64;
+      if (distance < threshold && !state.pinchTriggered) {
+        state.pinchTriggered = true;
+        handlePointer(0, 0);
+      }
+      state.pinchActive = distance < threshold * 1.5;
+    }
+
+    function onTouchMove(event) {
+      state.touches = Array.from(event.touches);
+      updateHandVisuals();
+      handlePinchSelection();
+      if (state.appSelected === 'sculptor' && event.touches.length === 1) {
+        const touch = event.touches[0];
+        const x = (touch.clientX / window.innerWidth) * 2 - 1;
+        const y = -(touch.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+        const point = raycaster.ray.at(0.7, new THREE.Vector3());
+        if (state.sculptorPoints.length > 128) {
+          state.sculptorPoints.shift();
+        }
+        state.sculptorPoints.push(point.clone());
+      }
+      if (state.appSelected !== 'sculptor') {
+        state.sculptorPoints = [];
+      }
+    }
+
+    function onTouchStart(event) {
+      state.touches = Array.from(event.touches);
+      updateHandVisuals();
+      handlePinchSelection();
+    }
+
+    function onTouchEnd(event) {
+      state.touches = Array.from(event.touches);
+      updateHandVisuals();
+      if (!state.touches.length) {
+        state.pinchActive = false;
+        state.pinchTriggered = false;
+      }
+    }
+
+    function lockLandscape() {
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
+    }
+
+    async function onStartButton() {
+      permError.textContent = '';
+      try {
+        await setupCameraStream('environment');
+        permOverlay.style.display = 'none';
+        hud.classList.add('visible');
+        initThree();
+        lockLandscape();
+        showToast('Камера запущена. Добро пожаловать в VR.');
+      } catch (error) {
+        permOverlay.style.display = 'flex';
+        permError.textContent = error.name === 'NotAllowedError'
+          ? 'Доступ к камере отклонён. Обновите страницу и разрешите доступ.'
+          : `Ошибка камеры: ${error.message}`;
+      }
+    }
+
+    function stopStream() {
+      if (!state.stream) return;
+      state.stream.getTracks().forEach(track => track.stop());
+      state.stream = null;
+    }
+
+    flipBtn.addEventListener('click', async () => {
+      if (!state.stream) return;
+      state.facingMode = state.facingMode === 'environment' ? 'user' : 'environment';
+      try {
+        await setupCameraStream(state.facingMode);
+        showToast(`Смена камеры: ${state.facingMode === 'environment' ? 'задняя' : 'фронтальная'}`);
+      } catch (error) {
+        showToast('Не удалось переключить камеру');
+      }
+    });
+
+    resetBtn.addEventListener('click', () => {
+      state.appSelected = null;
+      appPanels.forEach(panel => panel.userData.targetZ = panel.userData.basePosition.z);
+      showToast('Вид сброшен');
+    });
+
+    lockBtn.addEventListener('click', lockLandscape);
+    vrSwitch.addEventListener('click', () => {
+      state.stereoEnabled = !state.stereoEnabled;
+      updateStatus();
+      showToast(`VR режим ${state.stereoEnabled ? 'включён' : 'выключен'}`);
+    });
+
+    overlayClose.addEventListener('click', closeAppOverlay);
+    camBtn.addEventListener('click', onStartButton);
+    canvas.addEventListener('touchstart', onTouchStart, { passive: true });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: true });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: true });
+    canvas.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    canvas.addEventListener('click', event => {
+      const rect = canvas.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      handlePointer(x, y);
+    });
+
+    if (navigator.getBattery) {
+      navigator.getBattery().then(battery => {
+        state.battery = battery;
+        battery.addEventListener('levelchange', () => { state.battery = battery; });
+      }).catch(() => { state.battery = null; });
+    }
+  </script>
 </body>
 </html>
