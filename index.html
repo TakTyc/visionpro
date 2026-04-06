@@ -7,227 +7,87 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <title>Vision Pro Cardboard VR</title>
 <style>
-  :root {
-    color-scheme: dark;
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: #000;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
-  body { position: relative; }
+  canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 1;
+  }
 
   #video-bg {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
     z-index: 0;
-    background: #000;
   }
 
-  canvas {
+  #controls {
     position: fixed;
-    inset: 0;
-    z-index: 1;
-    pointer-events: auto;
-  }
-
-  #perm, #app-overlay, #hud, #toast {
-    position: fixed;
-    z-index: 10;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-
-  #perm {
-    inset: 0;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    z-index: 2;
     display: flex;
-    flex-direction: column;
-    align-items: center;
     justify-content: center;
-    gap: 18px;
-    padding: 28px;
-    background: radial-gradient(circle at top, rgba(24, 38, 72, 0.85), rgba(0,0,0,0.95));
-    backdrop-filter: blur(24px);
-  }
-
-  .p-logo {
-    width: 96px;
-    height: 96px;
-    border-radius: 28px;
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.12);
-    display: grid;
-    place-items: center;
-    font-size: 48px;
-    color: #9fcaff;
-    box-shadow: 0 0 50px rgba(95, 180, 255, 0.16);
-  }
-
-  .p-title {
-    color: #fff;
-    font-size: 30px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    text-align: center;
-  }
-
-  .p-sub {
-    color: rgba(255,255,255,0.68);
-    text-align: center;
-    line-height: 1.6;
-    max-width: 320px;
-    font-size: 15px;
-  }
-
-  .p-btn,
-  .hud-btn,
-  .overlay-close,
-  .low-btn {
-    border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 999px;
-    background: rgba(255,255,255,0.09);
-    color: #fff;
-    padding: 14px 22px;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform .18s ease, background .18s ease, border-color .18s ease;
-    backdrop-filter: blur(24px);
-  }
-
-  .p-btn:hover,
-  .hud-btn:hover,
-  .overlay-close:hover,
-  .low-btn:hover {
-    transform: scale(1.02);
-    background: rgba(255,255,255,0.14);
-  }
-
-  .p-err {
-    color: #ff7d7d;
-    font-size: 14px;
-    text-align: center;
-    max-width: 300px;
-    line-height: 1.4;
-  }
-
-  #hud {
-    bottom: 18px;
-    width: calc(100% - 24px);
-    max-width: 760px;
-    display: none;
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px;
-    background: rgba(12, 18, 35, 0.64);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 28px;
-    backdrop-filter: blur(24px);
-    box-shadow: 0 20px 80px rgba(0,0,0,0.35);
-  }
-
-  #hud.visible { display: flex; }
-
-  .hud-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; }
-  .hud-row .info { color: rgba(255,255,255,0.75); font-size: 13px; }
-
-  .toggle-wrapper {
-    display: flex;
-    align-items: center;
     gap: 10px;
-    color: rgba(255,255,255,0.76);
+    padding: 10px;
+  }
+
+  .btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    color: #fff;
+    padding: 10px 20px;
     font-size: 14px;
-    user-select: none;
-  }
-
-  .switch {
-    position: relative;
-    width: 44px;
-    height: 24px;
-    border-radius: 999px;
-    background: rgba(255,255,255,0.12);
     cursor: pointer;
-    border: 1px solid rgba(255,255,255,0.18);
+    transition: background 0.2s;
   }
 
-  .switch::after {
-    content: '';
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: #fff;
-    transition: transform .2s ease;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  .btn:hover {
+    background: rgba(255,255,255,0.2);
   }
 
-  .switch.on { background: rgba(96, 171, 255, 0.75); }
-  .switch.on::after { transform: translateX(20px); }
+  .btn.hidden {
+    display: none;
+  }
 
   #toast {
-    top: 18px;
-    width: auto;
-    padding: 12px 18px;
-    border-radius: 999px;
-    background: rgba(0,0,0,0.72);
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+    background: rgba(0,0,0,0.8);
     color: #fff;
-    font-size: 13px;
+    padding: 10px 20px;
+    border-radius: 20px;
     opacity: 0;
-    transition: opacity .24s ease;
-    pointer-events: none;
+    transition: opacity 0.3s;
   }
 
-  #toast.show { opacity: 1; }
-
-  #app-overlay {
-    top: 12px;
-    width: calc(100% - 28px);
-    max-width: 760px;
-    padding: 18px;
-    background: rgba(6, 12, 24, 0.82);
-    border: 1px solid rgba(255,255,255,0.14);
-    border-radius: 28px;
-    backdrop-filter: blur(26px);
-    box-shadow: 0 30px 100px rgba(0,0,0,0.35);
-    display: none;
-    flex-direction: column;
-    gap: 14px;
+  #toast.show {
+    opacity: 1;
   }
-
-  #app-overlay.visible { display: flex; }
-
-  .overlay-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .overlay-title { color: #fff; font-size: 18px; font-weight: 700; }
-
-  .overlay-body { color: rgba(255,255,255,0.78); font-size: 14px; line-height: 1.6; }
-
-  .overlay-content {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    min-height: 240px;
-    border-radius: 22px;
-    overflow: hidden;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.10);
-  }
-
-  .overlay-content iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
-  }
-
-  .low-btn { width: 100%; justify-content: center; }
 </style>
 <script type="importmap">
 {
@@ -239,48 +99,23 @@
 </script>
 </head>
 <body>
-  <div id="perm">
-    <div class="p-logo">👓</div>
-    <div class="p-title">Vision Pro Cardboard</div>
-    <div class="p-sub">Нажмите кнопку, чтобы включить заднюю камеру и войти в VR-режим без искажений.</div>
-    <button class="p-btn" id="cam-btn">Разрешить камеру</button>
-    <div class="p-err" id="perm-error"></div>
-  </div>
-
-  <video id="video-bg" autoplay muted playsinline></video>
+  <video id="video-bg"></video>
   <canvas id="scene-canvas"></canvas>
 
-  <div id="hud">
-    <div class="hud-row">
-      <button class="hud-btn" id="cam-flip-btn">🔄 Переключить камеру</button>
-      <button class="hud-btn" id="reset-btn">⊕ Сброс</button>
-      <button class="hud-btn" id="lock-btn">⤢ Ландшафт</button>
-    </div>
-    <div class="hud-row">
-      <div class="toggle-wrapper">
-        <div id="vr-switch" class="switch on"></div>
-        <span>Cardboard VR Mode</span>
-      </div>
-      <div class="info" id="status-info">Камера: задняя • VR: включён</div>
-    </div>
+  <div id="controls">
+    <button id="enableCameraBtn" class="btn">📷 Включить камеру</button>
+    <button id="switchCameraBtn" class="btn hidden">🔄 Переключить камеру</button>
+    <button id="vrToggleBtn" class="btn hidden">🕶️ VR On/Off</button>
+    <button id="resetBtn" class="btn hidden">⊕ Сброс</button>
   </div>
 
   <div id="toast"></div>
 
-  <div id="app-overlay">
-    <div class="overlay-header">
-      <div>
-        <div class="overlay-title" id="overlay-title">Приложение</div>
-        <div class="overlay-body" id="overlay-subtitle">Описание приложения.</div>
-      </div>
-      <button class="overlay-close" id="overlay-close">Закрыть</button>
-    </div>
-    <div class="overlay-content" id="overlay-content"></div>
-  </div>
-
   <script type="module">
     import * as THREE from 'three';
     import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js';
+
+    console.log('Vision Pro Cardboard VR starting...');
 
     const state = {
       stream: null,
@@ -298,22 +133,11 @@
 
     const video = document.getElementById('video-bg');
     const canvas = document.getElementById('scene-canvas');
-    const permOverlay = document.getElementById('perm');
-    const permError = document.getElementById('perm-error');
-    const hud = document.getElementById('hud');
-    const statusInfo = document.getElementById('status-info');
+    const enableCameraBtn = document.getElementById('enableCameraBtn');
+    const switchCameraBtn = document.getElementById('switchCameraBtn');
+    const vrToggleBtn = document.getElementById('vrToggleBtn');
+    const resetBtn = document.getElementById('resetBtn');
     const toastEl = document.getElementById('toast');
-    const vrSwitch = document.getElementById('vr-switch');
-    const appOverlay = document.getElementById('app-overlay');
-    const overlayTitle = document.getElementById('overlay-title');
-    const overlaySubtitle = document.getElementById('overlay-subtitle');
-    const overlayContent = document.getElementById('overlay-content');
-
-    const camBtn = document.getElementById('cam-btn');
-    const flipBtn = document.getElementById('cam-flip-btn');
-    const resetBtn = document.getElementById('reset-btn');
-    const lockBtn = document.getElementById('lock-btn');
-    const overlayClose = document.getElementById('overlay-close');
 
     let renderer, scene, camera, effect, clock, raycaster, animationId;
     const appPanels = [];
@@ -385,9 +209,10 @@
       ctx.fillText(line.trim(), x, y);
     }
 
-    async function setupCameraStream(facingMode) {
+    async function startCamera() {
+      console.log('Starting camera...');
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Камера не поддерживается браузером');
+        throw new Error('Camera not supported');
       }
 
       if (state.stream) {
@@ -398,30 +223,63 @@
       const constraints = {
         audio: false,
         video: {
-          facingMode,
+          facingMode: { exact: 'environment' },
           width: { ideal: 1920 },
           height: { ideal: 1080 }
         }
       };
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      state.stream = stream;
-      video.srcObject = stream;
-      await video.play();
-      if (video.readyState < 2) {
-        await new Promise(resolve => { video.onloadedmetadata = resolve; });
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        state.stream = stream;
+        video.srcObject = stream;
+        await video.play();
+        if (video.readyState < 2) {
+          await new Promise(resolve => { video.onloadedmetadata = resolve; });
+        }
+        state.facingMode = 'environment';
+        console.log('Camera started successfully');
+        showToast('Камера запущена');
+        enableCameraBtn.classList.add('hidden');
+        switchCameraBtn.classList.remove('hidden');
+        vrToggleBtn.classList.remove('hidden');
+        resetBtn.classList.remove('hidden');
+        return stream;
+      } catch (error) {
+        console.error('Camera error:', error);
+        // Fallback to basic constraints
+        const fallbackConstraints = {
+          audio: false,
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          }
+        };
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+          state.stream = stream;
+          video.srcObject = stream;
+          await video.play();
+          if (video.readyState < 2) {
+            await new Promise(resolve => { video.onloadedmetadata = resolve; });
+          }
+          state.facingMode = 'environment';
+          console.log('Camera started with fallback');
+          showToast('Камера запущена (fallback)');
+          enableCameraBtn.classList.add('hidden');
+          switchCameraBtn.classList.remove('hidden');
+          vrToggleBtn.classList.remove('hidden');
+          resetBtn.classList.remove('hidden');
+          return stream;
+        } catch (fallbackError) {
+          console.error('Fallback camera error:', fallbackError);
+          throw fallbackError;
+        }
       }
-      state.facingMode = facingMode;
-      updateStatus();
-      return stream;
     }
 
-    function updateStatus() {
-      const cameraLabel = state.facingMode === 'environment' ? 'задняя' : 'фронтальная';
-      const vrLabel = state.stereoEnabled && state.stereoSupported ? 'включён' : 'выключен';
-      statusInfo.textContent = `Камера: ${cameraLabel} • VR: ${vrLabel}`;
-      vrSwitch.classList.toggle('on', state.stereoEnabled && state.stereoSupported);
-    }
+
 
     function initThree() {
       renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -642,7 +500,7 @@
       const panel = appPanels.find(item => item.userData.id === panelId);
       if (!panel) return;
       if (state.appSelected === panelId) {
-        openAppOverlay(panelId);
+        showToast(`Открыто ${panel.userData.title}`);
         return;
       }
       state.appSelected = panelId;
@@ -652,60 +510,7 @@
       showToast(`Выбран ${panel.userData.title}`);
     }
 
-    function openAppOverlay(appId) {
-      const app = appDefinitions.find(item => item.id === appId);
-      if (!app) return;
-      overlayTitle.textContent = app.title;
-      overlaySubtitle.textContent = app.subtitle;
-      overlayContent.innerHTML = '';
-      appOverlay.classList.add('visible');
 
-      if (appId === 'cinema') {
-        const frame = document.createElement('iframe');
-        frame.src = 'https://www.youtube.com/embed/ScMzIvxBSi4?autoplay=1&rel=0&mute=1';
-        overlayContent.appendChild(frame);
-      } else if (appId === 'browser') {
-        const content = document.createElement('div');
-        content.style.padding = '18px';
-        content.style.color = '#eef7ff';
-        content.style.fontSize = '14px';
-        content.innerHTML = '<p>• Быстрые заметки из AR-сессии</p><p>• Напоминания</p><p>• Ссылки и идеи</p>';
-        overlayContent.appendChild(content);
-      } else if (appId === 'meditation') {
-        const content = document.createElement('div');
-        content.style.padding = '18px';
-        content.style.color = '#cfe8ff';
-        content.style.fontSize = '14px';
-        content.innerHTML = '<p>Глубокое дыхание.</p><p>Сосредоточьтесь на движении частиц.</p><p>Отдых для глаз и ума.</p>';
-        overlayContent.appendChild(content);
-      } else if (appId === 'monitor') {
-        const content = document.createElement('div');
-        content.style.padding = '18px';
-        content.style.color = '#eef7ff';
-        content.style.fontSize = '14px';
-        content.innerHTML = '<p>FPS отображается в реальном времени.</p><p>Заряд батареи обновляется автоматически.</p>';
-        overlayContent.appendChild(content);
-      } else if (appId === 'sculptor') {
-        const content = document.createElement('div');
-        content.style.padding = '18px';
-        content.style.color = '#eef7ff';
-        content.style.fontSize = '14px';
-        content.innerHTML = '<p>Проведите одним пальцем по экрану, чтобы рисовать в пространстве.</p><p>Двойное касание запускает щипок-клик.</p>';
-        overlayContent.appendChild(content);
-      } else if (appId === 'space') {
-        const content = document.createElement('div');
-        content.style.padding = '18px';
-        content.style.color = '#eef7ff';
-        content.style.fontSize = '14px';
-        content.innerHTML = '<p>Вращающаяся Земля в космическом пространстве.</p><p>Смотрите на панель и нажмите повторно.</p>';
-        overlayContent.appendChild(content);
-      }
-    }
-
-    function closeAppOverlay() {
-      appOverlay.classList.remove('visible');
-      overlayContent.innerHTML = '';
-    }
 
     function updateHandVisuals() {
       if (!state.touches.length) {
@@ -792,44 +597,33 @@
       }
     }
 
-    function lockLandscape() {
-      if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('landscape').catch(() => {});
-      }
-    }
 
-    async function onStartButton() {
-      permError.textContent = '';
+
+
+
+    enableCameraBtn.addEventListener('click', async () => {
       try {
-        await setupCameraStream('environment');
-        permOverlay.style.display = 'none';
-        hud.classList.add('visible');
+        await startCamera();
         initThree();
-        lockLandscape();
-        showToast('Камера запущена. Добро пожаловать в VR.');
       } catch (error) {
-        permOverlay.style.display = 'flex';
-        permError.textContent = error.name === 'NotAllowedError'
-          ? 'Доступ к камере отклонён. Обновите страницу и разрешите доступ.'
-          : `Ошибка камеры: ${error.message}`;
+        showToast('Ошибка камеры: ' + error.message);
       }
-    }
+    });
 
-    function stopStream() {
-      if (!state.stream) return;
-      state.stream.getTracks().forEach(track => track.stop());
-      state.stream = null;
-    }
-
-    flipBtn.addEventListener('click', async () => {
+    switchCameraBtn.addEventListener('click', async () => {
       if (!state.stream) return;
       state.facingMode = state.facingMode === 'environment' ? 'user' : 'environment';
       try {
-        await setupCameraStream(state.facingMode);
-        showToast(`Смена камеры: ${state.facingMode === 'environment' ? 'задняя' : 'фронтальная'}`);
+        await startCamera();
+        showToast(`Камера: ${state.facingMode === 'environment' ? 'задняя' : 'фронтальная'}`);
       } catch (error) {
         showToast('Не удалось переключить камеру');
       }
+    });
+
+    vrToggleBtn.addEventListener('click', () => {
+      state.stereoEnabled = !state.stereoEnabled;
+      showToast(`VR ${state.stereoEnabled ? 'включён' : 'выключен'}`);
     });
 
     resetBtn.addEventListener('click', () => {
@@ -838,15 +632,6 @@
       showToast('Вид сброшен');
     });
 
-    lockBtn.addEventListener('click', lockLandscape);
-    vrSwitch.addEventListener('click', () => {
-      state.stereoEnabled = !state.stereoEnabled;
-      updateStatus();
-      showToast(`VR режим ${state.stereoEnabled ? 'включён' : 'выключен'}`);
-    });
-
-    overlayClose.addEventListener('click', closeAppOverlay);
-    camBtn.addEventListener('click', onStartButton);
     canvas.addEventListener('touchstart', onTouchStart, { passive: true });
     canvas.addEventListener('touchmove', onTouchMove, { passive: true });
     canvas.addEventListener('touchend', onTouchEnd, { passive: true });
@@ -864,6 +649,8 @@
         battery.addEventListener('levelchange', () => { state.battery = battery; });
       }).catch(() => { state.battery = null; });
     }
+
+    console.log('Vision Pro Cardboard VR initialized');
   </script>
 </body>
 </html>
